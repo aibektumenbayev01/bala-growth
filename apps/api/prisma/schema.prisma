@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Child {
+  id          String        @id @default(cuid())
+  name        String
+  gender      String
+  birthDate   DateTime
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  measurements Measurement[]
+}
+
+model Measurement {
+  id        String   @id @default(cuid())
+  childId   String
+  date      DateTime
+  height    Float
+  weight    Float
+  createdAt DateTime @default(now())
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId, date])
+}
