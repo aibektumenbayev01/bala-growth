@@ -799,7 +799,7 @@ export default function App() {
               }}
               formatter={(value, name) => {
                 if (name === "childHeight") {
-                  return [`${value} см`, "Рост ребёнка"];
+                  return [`${value} см`, "Рост ребёнка"]; //refnrje
                 }
                 if (name === "p3") return [`${value} см`, "WHO 3rd"];
                 if (name === "p15") return [`${value} см`, "WHO 15th"];
