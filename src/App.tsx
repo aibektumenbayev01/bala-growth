@@ -23,6 +23,10 @@ import {
   Trash2,
   User,
   Activity,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+  X,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -80,6 +84,174 @@ function getAgeText(birthDate: Date | string) {
   }
 
   return `${years} г ${months} мес`;
+}
+
+type ToastType = "success" | "warning" | "info";
+
+type ToastState = {
+  id: number;
+  message: string;
+  type: ToastType;
+} | null;
+
+type AnalysisStatus = "normal" | "watch" | "alert";
+
+type GrowthAnalysis = {
+  status: AnalysisStatus;
+  title: string;
+  summary: string;
+  recommendation: string;
+  nextMeasurement: string;
+  percentileBand: string;
+  growthVelocityText: string;
+};
+
+function getStatusStyles(status: AnalysisStatus) {
+  if (status === "alert") {
+    return {
+      badge: "bg-red-50 text-red-700 border border-red-200",
+      card: "border-red-200 bg-red-50",
+      icon: <AlertTriangle size={18} />,
+      label: "Требует внимания",
+    };
+  }
+
+  if (status === "watch") {
+    return {
+      badge: "bg-amber-50 text-amber-700 border border-amber-200",
+      card: "border-amber-200 bg-amber-50",
+      icon: <Info size={18} />,
+      label: "Наблюдение",
+    };
+  }
+
+  return {
+    badge: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    card: "border-emerald-200 bg-emerald-50",
+    icon: <CheckCircle2 size={18} />,
+    label: "Норма",
+  };
+}
+
+function getToastStyles(type: ToastType) {
+  if (type === "warning") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+  if (type === "info") {
+    return "border-cyan-200 bg-cyan-50 text-cyan-800";
+  }
+  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function safeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function analyzeGrowth(
+  child: Child | null,
+  childMeasurements: Measurement[],
+  whoHeightData: typeof hfaBoys5to19,
+  lastHeightPercentileBand: string
+): GrowthAnalysis | null {
+  if (!child || childMeasurements.length === 0) return null;
+
+  const last = childMeasurements.at(-1);
+  const prev = childMeasurements.length >= 2 ? childMeasurements.at(-2) : null;
+
+  if (!last) return null;
+
+  const ageMonths = getAgeInMonths(child.birthDate, last.date);
+ const whoRow = getNearestWhoRow(whoHeightData, ageMonths);
+
+  const p3 = whoRow ? safeNumber(whoRow.p3) : null;
+  const p15 = whoRow ? safeNumber(whoRow.p15) : null;
+  const p50 = whoRow ? safeNumber(whoRow.p50) : null;
+
+  let annualGrowth: number | null = null;
+  if (prev) {
+    const monthsDiff = getAgeInMonths(prev.date, last.date);
+    if (monthsDiff > 0) {
+      annualGrowth = ((last.height - prev.height) / monthsDiff) * 12;
+    }
+  }
+
+  const tooLow = p3 !== null ? last.height < p3 : false;
+  const belowExpected = p15 !== null ? last.height < p15 : false;
+  const tooFastJump = annualGrowth !== null ? annualGrowth > 12 : false;
+  const slowedGrowth = annualGrowth !== null ? annualGrowth < 4 : false;
+
+  let status: AnalysisStatus = "normal";
+  let title = "Рост соответствует ожидаемому диапазону";
+  let summary = "Показатели выглядят стабильными для текущего возраста.";
+  let recommendation = "Плановый контроль роста через 3 месяца.";
+  let nextMeasurement = "Через 3 месяца";
+
+  if (tooLow) {
+    status = "alert";
+    title = "Есть признаки выраженной низкорослости";
+    summary =
+      "Последний рост находится ниже 3-го перцентиля или очень близко к нему.";
+    recommendation =
+      "Желательно провести повторное измерение и рассмотреть консультацию педиатра или детского эндокринолога.";
+    nextMeasurement = "Через 2–4 недели";
+  } else if (belowExpected) {
+    status = "watch";
+    title = "Рост ниже ожидаемого диапазона";
+    summary =
+      "Последний рост находится ниже 15-го перцентиля и требует наблюдения в динамике.";
+    recommendation =
+      "Повторите измерение в ближайшие 1–3 месяца и следите за темпом роста.";
+    nextMeasurement = "Через 1–3 месяца";
+  }
+
+  if (slowedGrowth) {
+    status = status === "alert" ? "alert" : "watch";
+    title = "Отмечается замедление темпа роста";
+    summary =
+      annualGrowth !== null
+        ? `Ориентировочная скорость роста: ${annualGrowth.toFixed(
+            1
+          )} см/год, что ниже ожидаемого темпа.`
+        : summary;
+    recommendation =
+      "Нужен контроль повторных измерений, желательно в одинаковых условиях.";
+    nextMeasurement = "Через 1–2 месяца";
+  }
+
+  if (tooFastJump) {
+    status = "watch";
+    title = "Проверьте корректность последнего измерения";
+    summary =
+      annualGrowth !== null
+        ? `Получился слишком большой скачок: около ${annualGrowth.toFixed(
+            1
+          )} см/год. Возможно, есть ошибка измерения или ввода данных.`
+        : "Есть вероятность неточности в последних данных.";
+    recommendation =
+      "Рекомендуется перепроверить рост и вес и повторить запись.";
+    nextMeasurement = "В ближайшие дни";
+  }
+
+  if (!prev) {
+    summary =
+      "Пока доступно только одно измерение. Для более точной оценки нужна динамика.";
+    recommendation =
+      "Добавьте следующее измерение, чтобы система смогла оценить темп роста.";
+    nextMeasurement = "Через 1–3 месяца";
+  }
+
+  return {
+    status,
+    title,
+    summary,
+    recommendation,
+    nextMeasurement,
+    percentileBand: lastHeightPercentileBand,
+    growthVelocityText:
+      annualGrowth !== null
+        ? `${annualGrowth.toFixed(1)} см/год`
+        : "Недостаточно данных",
+  };
 }
 
 const ui = {
@@ -171,6 +343,16 @@ export default function App() {
 
   const [error, setError] = useState<string | null>(null);
   const [chartTab, setChartTab] = useState<"height" | "weight">("height");
+  const [toast, setToast] = useState<ToastState>(null);
+
+  const showToast = (message: string, type: ToastType = "success") => {
+    const id = Date.now();
+    setToast({ id, message, type });
+
+    window.setTimeout(() => {
+      setToast((current) => (current?.id === id ? null : current));
+    }, 3000);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -256,6 +438,8 @@ export default function App() {
       setNewGender("male");
       setNewBirthDate(new Date().toISOString().slice(0, 10));
       setIsFormOpen(false);
+
+      showToast("Профиль ребёнка успешно создан", "success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create child");
     } finally {
@@ -268,6 +452,7 @@ export default function App() {
       setError(null);
       await deleteMeasurement(id);
       setMeasurements((prev) => prev.filter((m) => m.id !== id));
+      showToast("Измерение удалено", "info");
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Failed to delete measurement"
@@ -301,6 +486,8 @@ export default function App() {
       setHeight("");
       setWeight("");
       setMDate(new Date().toISOString().slice(0, 10));
+
+      showToast("Измерение сохранено и график обновлён", "success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create measurement");
     } finally {
@@ -334,13 +521,13 @@ export default function App() {
   }, [selectedChild, whoHeightData, childHeightData]);
 
   const weightChartData = useMemo(() => {
-  if (!selectedChild) return [];
+    if (!selectedChild) return [];
 
-  return childMeasurements.map((m) => ({
-    ageMonths: getAgeInMonths(selectedChild.birthDate, m.date),
-    weight: m.weight,
-  }));
-}, [selectedChild, childMeasurements]);
+    return childMeasurements.map((m) => ({
+      ageMonths: getAgeInMonths(selectedChild.birthDate, m.date),
+      weight: m.weight,
+    }));
+  }, [selectedChild, childMeasurements]);
 
   const last = childMeasurements.at(-1);
   const prev = childMeasurements.length >= 2 ? childMeasurements.at(-2) : null;
@@ -364,9 +551,54 @@ export default function App() {
         )
       : "—";
 
+  const growthAnalysis = useMemo(() => {
+    return analyzeGrowth(
+      selectedChild,
+      childMeasurements,
+      whoHeightData as Array<Record<string, unknown>>,
+      String(lastHeightPercentileBand)
+    );
+  }, [selectedChild, childMeasurements, whoHeightData, lastHeightPercentileBand]);
+
+  const analysisStyles = growthAnalysis
+    ? getStatusStyles(growthAnalysis.status)
+    : null;
+
+  const reminderText = growthAnalysis
+    ? `Следующее измерение желательно внести ${growthAnalysis.nextMeasurement.toLowerCase()}.`
+    : "Следующее измерение желательно внести через 2–4 недели.";
+
   return (
     <div className={ui.page}>
       <div className={ui.shell}>
+        {toast ? (
+          <div className="pointer-events-none fixed right-4 top-4 z-[100]">
+            <div
+              className={`pointer-events-auto flex min-w-[280px] items-start gap-3 rounded-2xl border px-4 py-3 shadow-lg ${getToastStyles(
+                toast.type
+              )}`}
+            >
+              <div className="mt-0.5">
+                {toast.type === "success" ? (
+                  <CheckCircle2 size={18} />
+                ) : toast.type === "warning" ? (
+                  <AlertTriangle size={18} />
+                ) : (
+                  <Info size={18} />
+                )}
+              </div>
+              <div className="flex-1 text-sm font-medium">{toast.message}</div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="rounded-md p-1 opacity-70 transition hover:bg-white/50 hover:opacity-100"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <header className={ui.header}>
           <div className={ui.headerInner}>
             <div className="flex items-center gap-3">
@@ -433,7 +665,7 @@ export default function App() {
                     Reminder
                   </p>
                   <p className="mt-2 text-sm font-medium text-slate-700">
-                    Следующее измерение желательно внести через 2–4 недели.
+                    {reminderText}
                   </p>
                 </div>
               </div>
@@ -620,6 +852,15 @@ export default function App() {
                           <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                             ID: {selectedChild.id.slice(0, 6)}
                           </span>
+
+                          {analysisStyles ? (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${analysisStyles.badge}`}
+                            >
+                              {analysisStyles.icon}
+                              {analysisStyles.label}
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-500">
@@ -700,231 +941,304 @@ export default function App() {
                   />
                 </section>
 
+                {growthAnalysis && analysisStyles ? (
+                  <section
+                    className={`rounded-2xl border p-5 shadow-sm ${analysisStyles.card}`}
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5">{analysisStyles.icon}</div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-bold text-slate-900">
+                              Результат анализа
+                            </h3>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${analysisStyles.badge}`}
+                            >
+                              {analysisStyles.label}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-base font-semibold text-slate-900">
+                            {growthAnalysis.title}
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">
+                            {growthAnalysis.summary}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 text-sm text-slate-700 md:min-w-[280px]">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-slate-500">Перцентиль роста</span>
+                          <span className="font-semibold text-slate-900">
+                            {growthAnalysis.percentileBand}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <span className="text-slate-500">Темп роста</span>
+                          <span className="font-semibold text-slate-900">
+                            {growthAnalysis.growthVelocityText}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <span className="text-slate-500">Следующий контроль</span>
+                          <span className="font-semibold text-slate-900">
+                            {growthAnalysis.nextMeasurement}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl bg-white/70 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Рекомендация
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-slate-800">
+                        {growthAnalysis.recommendation}
+                      </p>
+                    </div>
+                  </section>
+                ) : null}
+
                 <section className={`${ui.card} overflow-hidden`}>
                   <div className="border-b border-slate-200 p-5 md:p-6">
-  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-    <div>
-      <h3 className="text-lg font-bold text-slate-900">
-        {chartTab === "height" ? "WHO Height-for-age Chart" : "Weight Chart"}
-      </h3>
-      <p className="mt-1 text-sm text-slate-500">
-        {chartTab === "height"
-          ? "WHO reference percentiles + рост ребёнка"
-          : "История изменения веса по возрасту"}
-      </p>
-    </div>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">
+                          {chartTab === "height"
+                            ? "WHO Height-for-age Chart"
+                            : "Weight Chart"}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {chartTab === "height"
+                            ? "WHO reference percentiles + рост ребёнка"
+                            : "История изменения веса по возрасту"}
+                        </p>
+                      </div>
 
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setChartTab("height")}
-        className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-          chartTab === "height"
-            ? "bg-cyan-500 text-white"
-            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-        }`}
-      >
-        Рост (WHO)
-      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setChartTab("height")}
+                          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                            chartTab === "height"
+                              ? "bg-cyan-500 text-white"
+                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          Рост (WHO)
+                        </button>
 
-      <button
-        type="button"
-        onClick={() => setChartTab("weight")}
-        className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-          chartTab === "weight"
-            ? "bg-cyan-500 text-white"
-            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-        }`}
-      >
-        Вес
-      </button>
-    </div>
-  </div>
-</div>
+                        <button
+                          type="button"
+                          onClick={() => setChartTab("weight")}
+                          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                            chartTab === "weight"
+                              ? "bg-cyan-500 text-white"
+                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          Вес
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="p-5 md:p-6">
-  <div className="h-[360px] rounded-xl border border-slate-200 bg-slate-50 p-3">
-    {loadingMeasurements ? (
-      <div className="flex h-full items-center justify-center text-slate-500">
-        <Loader2 className="mr-2 animate-spin" size={16} />
-        Загрузка...
-      </div>
-    ) : chartTab === "height" ? (
-      chartData.length < 2 ? (
-        <div className="flex h-full items-center justify-center text-slate-500">
-          Добавь хотя бы 2 измерения, чтобы увидеть график роста
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={chartData}
-            margin={{ top: 10, right: 18, left: 0, bottom: 10 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <div className="h-[360px] rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      {loadingMeasurements ? (
+                        <div className="flex h-full items-center justify-center text-slate-500">
+                          <Loader2 className="mr-2 animate-spin" size={16} />
+                          Загрузка...
+                        </div>
+                      ) : chartTab === "height" ? (
+                        chartData.length < 2 ? (
+                          <div className="flex h-full items-center justify-center text-slate-500">
+                            Добавь хотя бы 2 измерения, чтобы увидеть график роста
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={chartData}
+                              margin={{ top: 10, right: 18, left: 0, bottom: 10 }}
+                            >
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="#e2e8f0"
+                              />
 
-            <XAxis
-              dataKey="ageMonths"
-              type="number"
-              domain={["dataMin", "dataMax"]}
-              tick={{ fill: "#64748b", fontSize: 12 }}
-              axisLine={{ stroke: "#cbd5e1" }}
-              tickLine={{ stroke: "#cbd5e1" }}
-              tickFormatter={(value) => {
-                const years = Math.floor(Number(value) / 12);
-                const months = Number(value) % 12;
-                return `${years}г ${months}м`;
-              }}
-            />
+                              <XAxis
+                                dataKey="ageMonths"
+                                type="number"
+                                domain={["dataMin", "dataMax"]}
+                                tick={{ fill: "#64748b", fontSize: 12 }}
+                                axisLine={{ stroke: "#cbd5e1" }}
+                                tickLine={{ stroke: "#cbd5e1" }}
+                                tickFormatter={(value) => {
+                                  const years = Math.floor(Number(value) / 12);
+                                  const months = Number(value) % 12;
+                                  return `${years}г ${months}м`;
+                                }}
+                              />
 
-            <YAxis
-              yAxisId="left"
-              width={44}
-              tick={{ fill: "#64748b", fontSize: 12 }}
-              axisLine={{ stroke: "#cbd5e1" }}
-              tickLine={{ stroke: "#cbd5e1" }}
-            />
+                              <YAxis
+                                yAxisId="left"
+                                width={44}
+                                tick={{ fill: "#64748b", fontSize: 12 }}
+                                axisLine={{ stroke: "#cbd5e1" }}
+                                tickLine={{ stroke: "#cbd5e1" }}
+                              />
 
-            <Tooltip
-              contentStyle={{
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: 16,
-                color: "#0f172a",
-              }}
-              labelStyle={{ color: "#334155" }}
-              labelFormatter={(value) => {
-                const years = Math.floor(Number(value) / 12);
-                const months = Number(value) % 12;
-                return `Возраст: ${years} г ${months} мес`;
-              }}
-              formatter={(value, name) => {
-                if (name === "childHeight") {
-                  return [`${value} см`, "Рост ребёнка"]; //refnrje
-                }
-                if (name === "p3") return [`${value} см`, "WHO 3rd"];
-                if (name === "p15") return [`${value} см`, "WHO 15th"];
-                if (name === "p50") return [`${value} см`, "WHO 50th"];
-                if (name === "p85") return [`${value} см`, "WHO 85th"];
-                if (name === "p97") return [`${value} см`, "WHO 97th"];
-                return [value as string, name as string];
-              }}
-            />
+                              <Tooltip
+                                contentStyle={{
+                                  background: "#ffffff",
+                                  border: "1px solid #e2e8f0",
+                                  borderRadius: 16,
+                                  color: "#0f172a",
+                                }}
+                                labelStyle={{ color: "#334155" }}
+                                labelFormatter={(value) => {
+                                  const years = Math.floor(Number(value) / 12);
+                                  const months = Number(value) % 12;
+                                  return `Возраст: ${years} г ${months} мес`;
+                                }}
+                                formatter={(value, name) => {
+                                  if (name === "childHeight") {
+                                    return [`${value} см`, "Рост ребёнка"];
+                                  }
+                                  if (name === "p3") return [`${value} см`, "WHO 3rd"];
+                                  if (name === "p15")
+                                    return [`${value} см`, "WHO 15th"];
+                                  if (name === "p50")
+                                    return [`${value} см`, "WHO 50th"];
+                                  if (name === "p85")
+                                    return [`${value} см`, "WHO 85th"];
+                                  if (name === "p97")
+                                    return [`${value} см`, "WHO 97th"];
+                                  return [value as string, name as string];
+                                }}
+                              />
 
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="p3"
-              stroke="#e2e8f0"
-              dot={false}
-              strokeWidth={2}
-            />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="p15"
-              stroke="#cbd5e1"
-              dot={false}
-              strokeWidth={2}
-            />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="p50"
-              stroke="#94a3b8"
-              dot={false}
-              strokeWidth={2.5}
-            />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="p85"
-              stroke="#cbd5e1"
-              dot={false}
-              strokeWidth={2}
-            />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="p97"
-              stroke="#e2e8f0"
-              dot={false}
-              strokeWidth={2}
-            />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="p3"
+                                stroke="#e2e8f0"
+                                dot={false}
+                                strokeWidth={2}
+                              />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="p15"
+                                stroke="#cbd5e1"
+                                dot={false}
+                                strokeWidth={2}
+                              />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="p50"
+                                stroke="#94a3b8"
+                                dot={false}
+                                strokeWidth={2.5}
+                              />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="p85"
+                                stroke="#cbd5e1"
+                                dot={false}
+                                strokeWidth={2}
+                              />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="p97"
+                                stroke="#e2e8f0"
+                                dot={false}
+                                strokeWidth={2}
+                              />
 
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="childHeight"
-              dot={{ r: 4 }}
-              stroke="#06b6d4"
-              strokeWidth={3}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      )
-    ) : weightChartData.length < 2 ? (
-      <div className="flex h-full items-center justify-center text-slate-500">
-        Добавь хотя бы 2 измерения, чтобы увидеть график веса
-      </div>
-    ) : (
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          data={weightChartData}
-          margin={{ top: 10, right: 18, left: 0, bottom: 10 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                              <Line
+                                yAxisId="left"
+                                type="monotone"
+                                dataKey="childHeight"
+                                dot={{ r: 4 }}
+                                stroke="#06b6d4"
+                                strokeWidth={3}
+                                activeDot={{ r: 6 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        )
+                      ) : weightChartData.length < 2 ? (
+                        <div className="flex h-full items-center justify-center text-slate-500">
+                          Добавь хотя бы 2 измерения, чтобы увидеть график веса
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={weightChartData}
+                            margin={{ top: 10, right: 18, left: 0, bottom: 10 }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              stroke="#e2e8f0"
+                            />
 
-          <XAxis
-            dataKey="ageMonths"
-            type="number"
-            domain={["dataMin", "dataMax"]}
-            tick={{ fill: "#64748b", fontSize: 12 }}
-            axisLine={{ stroke: "#cbd5e1" }}
-            tickLine={{ stroke: "#cbd5e1" }}
-            tickFormatter={(value) => {
-              const years = Math.floor(Number(value) / 12);
-              const months = Number(value) % 12;
-              return `${years}г ${months}м`;
-            }}
-          />
+                            <XAxis
+                              dataKey="ageMonths"
+                              type="number"
+                              domain={["dataMin", "dataMax"]}
+                              tick={{ fill: "#64748b", fontSize: 12 }}
+                              axisLine={{ stroke: "#cbd5e1" }}
+                              tickLine={{ stroke: "#cbd5e1" }}
+                              tickFormatter={(value) => {
+                                const years = Math.floor(Number(value) / 12);
+                                const months = Number(value) % 12;
+                                return `${years}г ${months}м`;
+                              }}
+                            />
 
-          <YAxis
-            width={44}
-            tick={{ fill: "#64748b", fontSize: 12 }}
-            axisLine={{ stroke: "#cbd5e1" }}
-            tickLine={{ stroke: "#cbd5e1" }}
-          />
+                            <YAxis
+                              width={44}
+                              tick={{ fill: "#64748b", fontSize: 12 }}
+                              axisLine={{ stroke: "#cbd5e1" }}
+                              tickLine={{ stroke: "#cbd5e1" }}
+                            />
 
-          <Tooltip
-            contentStyle={{
-              background: "#ffffff",
-              border: "1px solid #e2e8f0",
-              borderRadius: 16,
-              color: "#0f172a",
-            }}
-            labelStyle={{ color: "#334155" }}
-            labelFormatter={(value) => {
-              const years = Math.floor(Number(value) / 12);
-              const months = Number(value) % 12;
-              return `Возраст: ${years} г ${months} мес`;
-            }}
-            formatter={(value) => [`${value} кг`, "Вес"]}
-          />
+                            <Tooltip
+                              contentStyle={{
+                                background: "#ffffff",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: 16,
+                                color: "#0f172a",
+                              }}
+                              labelStyle={{ color: "#334155" }}
+                              labelFormatter={(value) => {
+                                const years = Math.floor(Number(value) / 12);
+                                const months = Number(value) % 12;
+                                return `Возраст: ${years} г ${months} мес`;
+                              }}
+                              formatter={(value) => [`${value} кг`, "Вес"]}
+                            />
 
-          <Line
-            type="monotone"
-            dataKey="weight"
-            dot={{ r: 4 }}
-            stroke="#8b5cf6"
-            strokeWidth={3}
-            activeDot={{ r: 6 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    )}
-  </div>
-</div>
+                            <Line
+                              type="monotone"
+                              dataKey="weight"
+                              dot={{ r: 4 }}
+                              stroke="#8b5cf6"
+                              strokeWidth={3}
+                              activeDot={{ r: 6 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
                 </section>
 
                 <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -933,12 +1247,24 @@ export default function App() {
                     className={`${ui.card} ${ui.cardPad} xl:col-span-1`}
                   >
                     <div className="mb-4">
-                      <h3 className="text-base font-bold text-slate-900">
-                        Добавить измерение
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Дата, рост и вес сохраняются в базу.
-                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">
+                            Добавить измерение
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Дата, рост и вес сохраняются в базу.
+                          </p>
+                        </div>
+
+                        {analysisStyles ? (
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${analysisStyles.badge}`}
+                          >
+                            {analysisStyles.label}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="space-y-3">
@@ -984,6 +1310,23 @@ export default function App() {
                         Сохранить
                       </button>
                     </div>
+
+                    {growthAnalysis ? (
+                      <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Рекомендация после анализа
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">
+                          {growthAnalysis.title}
+                        </p>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {growthAnalysis.recommendation}
+                        </p>
+                        <div className="mt-3 text-xs text-slate-500">
+                          Следующий контроль: {growthAnalysis.nextMeasurement}
+                        </div>
+                      </div>
+                    ) : null}
                   </form>
 
                   <div className={`${ui.card} ${ui.cardPad} xl:col-span-2`}>
