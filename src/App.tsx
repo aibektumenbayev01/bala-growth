@@ -8,6 +8,7 @@ import {
 import { hfaBoys5to19 } from "./who/hfa-boys-5-19";
 import { hfaGirls5to19 } from "./who/hfa-girls-5-19";
 
+import type { WhoHeightPoint } from "./lib/growth";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { Child, Measurement } from "@bala/shared";
@@ -460,40 +461,89 @@ export default function App() {
     }
   };
 
-  const handleAddMeasurement = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedChild) return;
+const handleAddMeasurement = async (e: FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  if (!selectedChild) return;
 
-    const h = Number(height);
-    const w = Number(weight);
+  const h = Number(height);
+  const w = Number(weight);
+  const measurementDate = new Date(mDate);
+  const birthDate = new Date(selectedChild.birthDate);
+  const today = new Date();
 
-    if (!Number.isFinite(h) || !Number.isFinite(w)) return;
-    if (h <= 0 || w <= 0) return;
+  today.setHours(23, 59, 59, 999);
 
-    try {
-      setError(null);
-      setSavingMeasurement(true);
+  if (!mDate) {
+    showToast("Укажите дату измерения", "warning");
+    return;
+  }
 
-      const created = await createMeasurement(selectedChild.id, {
-        date: new Date(mDate),
-        height: h,
-        weight: w,
-      });
+  if (!Number.isFinite(h)) {
+    showToast("Введите корректный рост", "warning");
+    return;
+  }
 
-      const normalized = normalizeMeasurement(created);
+  if (!Number.isFinite(w)) {
+    showToast("Введите корректный вес", "warning");
+    return;
+  }
 
-      setMeasurements((prev) => [...prev, normalized]);
-      setHeight("");
-      setWeight("");
-      setMDate(new Date().toISOString().slice(0, 10));
+  if (h < 30 || h > 250) {
+    showToast("Рост должен быть в диапазоне 30–250 см", "warning");
+    return;
+  }
 
-      showToast("Измерение сохранено и график обновлён", "success");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create measurement");
-    } finally {
-      setSavingMeasurement(false);
-    }
-  };
+  if (w < 1 || w > 200) {
+    showToast("Вес должен быть в диапазоне 1–200 кг", "warning");
+    return;
+  }
+
+  if (measurementDate < birthDate) {
+    showToast("Дата измерения не может быть раньше даты рождения", "warning");
+    return;
+  }
+
+  if (measurementDate > today) {
+    showToast("Дата измерения не может быть позже сегодняшнего дня", "warning");
+    return;
+  }
+
+  const duplicate = childMeasurements.some((m) => {
+    const sameDate =
+      new Date(m.date).toDateString() === measurementDate.toDateString();
+    return sameDate && m.height === h && m.weight === w;
+  });
+
+  if (duplicate) {
+    showToast("Такая запись уже существует", "warning");
+    return;
+  }
+
+  try {
+    setError(null);
+    setSavingMeasurement(true);
+
+    const created = await createMeasurement(selectedChild.id, {
+      date: measurementDate,
+      height: h,
+      weight: w,
+    });
+
+    const normalized = normalizeMeasurement(created);
+
+    setMeasurements((prev) => [...prev, normalized]);
+    setHeight("");
+    setWeight("");
+    setMDate(new Date().toISOString().slice(0, 10));
+
+    showToast("Измерение сохранено и график обновлён", "success");
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "Failed to create measurement");
+    showToast("Не удалось сохранить измерение", "warning");
+  } finally {
+    setSavingMeasurement(false);
+  }
+};
 
   const childMeasurements = useMemo(() => {
     return measurements
@@ -551,15 +601,15 @@ export default function App() {
         )
       : "—";
 
-  const growthAnalysis = useMemo(() => {
-    return analyzeGrowth(
-      selectedChild,
-      childMeasurements,
-      whoHeightData as Array<Record<string, unknown>>,
-      String(lastHeightPercentileBand)
-    );
-  }, [selectedChild, childMeasurements, whoHeightData, lastHeightPercentileBand]);
-
+ const growthAnalysis = useMemo(() => {
+  return analyzeGrowth(
+    selectedChild,
+    childMeasurements,
+    whoHeightData as WhoHeightPoint[],  
+    
+    String(lastHeightPercentileBand)
+  );
+}, [selectedChild, childMeasurements, whoHeightData, lastHeightPercentileBand]);
   const analysisStyles = growthAnalysis
     ? getStatusStyles(growthAnalysis.status)
     : null;
@@ -1170,6 +1220,7 @@ export default function App() {
                                 stroke="#06b6d4"
                                 strokeWidth={3}
                                 activeDot={{ r: 6 }}
+                                connectNulls={false}
                               />
                             </LineChart>
                           </ResponsiveContainer>
@@ -1204,11 +1255,13 @@ export default function App() {
                             />
 
                             <YAxis
-                              width={44}
-                              tick={{ fill: "#64748b", fontSize: 12 }}
-                              axisLine={{ stroke: "#cbd5e1" }}
-                              tickLine={{ stroke: "#cbd5e1" }}
-                            />
+                            yAxisId="left"
+                            width={44}
+                            domain={["dataMin - 3", "dataMax + 3"]}
+                            tick={{ fill: "#64748b", fontSize: 12 }}
+                            axisLine={{ stroke: "#cbd5e1" }}
+                            tickLine={{ stroke: "#cbd5e1" }}
+                          />
 
                             <Tooltip
                               contentStyle={{
@@ -1274,6 +1327,8 @@ export default function App() {
                         onChange={(e) => setMDate(e.target.value)}
                         className={ui.input}
                         required
+                        min={selectedChild ? new Date(selectedChild.birthDate).toISOString().slice(0, 10) : undefined}
+                        max={new Date().toISOString().slice(0, 10)}
                       />
                       <input
                         type="number"
@@ -1284,6 +1339,7 @@ export default function App() {
                         required
                         min={30}
                         max={250}
+                        step="0.1"
                       />
                       <input
                         type="number"
@@ -1384,9 +1440,10 @@ export default function App() {
                 </footer>
               </div>
             )}
-          </main>
+          </main> 
         </div>
       </div>
     </div>
   );
 }
+// kgege

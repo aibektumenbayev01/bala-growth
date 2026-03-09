@@ -26,6 +26,22 @@ function toDate(value: string | Date): Date {
   return value instanceof Date ? value : new Date(value);
 }
 
+function toSafeNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeWhoRow(row: WhoHeightPoint): WhoHeightPoint {
+  return {
+    ageMonths: toSafeNumber(row.ageMonths),
+    p3: toSafeNumber(row.p3),
+    p15: toSafeNumber(row.p15),
+    p50: toSafeNumber(row.p50),
+    p85: toSafeNumber(row.p85),
+    p97: toSafeNumber(row.p97),
+  };
+}
+
 export function getAgeInMonths(
   birthDateValue: string | Date,
   measureDateValue: string | Date
@@ -54,29 +70,13 @@ export function prepareChildHeightMeasurements(
       ageMonths: getAgeInMonths(birthDateValue, m.date),
       height: Number(m.height),
     }))
-    .filter((m) => Number.isFinite(m.height))
+    .filter(
+      (m) =>
+        Number.isFinite(m.ageMonths) &&
+        Number.isFinite(m.height) &&
+        m.height > 0
+    )
     .sort((a, b) => a.ageMonths - b.ageMonths);
-}
-
-export function prepareChartData(
-  whoData: WhoHeightPoint[],
-  childMeasurements: ChildHeightMeasurementPoint[]
-): GrowthChartPoint[] {
-  return whoData.map((row) => {
-    const measurement = childMeasurements.find(
-      (m) => Math.abs(m.ageMonths - row.ageMonths) <= 2
-    );
-
-    return {
-      ageMonths: row.ageMonths,
-      p3: row.p3,
-      p15: row.p15,
-      p50: row.p50,
-      p85: row.p85,
-      p97: row.p97,
-      childHeight: measurement ? measurement.height : null,
-    };
-  });
 }
 
 export function getNearestWhoRow(
@@ -85,10 +85,12 @@ export function getNearestWhoRow(
 ): WhoHeightPoint | null {
   if (whoData.length === 0) return null;
 
-  let nearest = whoData[0];
-  let minDiff = Math.abs(whoData[0].ageMonths - ageMonths);
+  const normalized = whoData.map(normalizeWhoRow);
 
-  for (const row of whoData) {
+  let nearest = normalized[0];
+  let minDiff = Math.abs(normalized[0].ageMonths - ageMonths);
+
+  for (const row of normalized) {
     const diff = Math.abs(row.ageMonths - ageMonths);
     if (diff < minDiff) {
       minDiff = diff;
@@ -99,16 +101,79 @@ export function getNearestWhoRow(
   return nearest;
 }
 
+export function prepareChartData(
+  whoData: WhoHeightPoint[],
+  childMeasurements: ChildHeightMeasurementPoint[]
+): GrowthChartPoint[] {
+  const normalizedWho = whoData
+    .map(normalizeWhoRow)
+    .filter(
+      (row) =>
+        Number.isFinite(row.ageMonths) &&
+        Number.isFinite(row.p3) &&
+        Number.isFinite(row.p15) &&
+        Number.isFinite(row.p50) &&
+        Number.isFinite(row.p85) &&
+        Number.isFinite(row.p97)
+    )
+    .sort((a, b) => a.ageMonths - b.ageMonths);
+
+  if (normalizedWho.length === 0) return [];
+
+  const normalizedChild = childMeasurements
+    .map((m) => ({
+      ageMonths: Number(m.ageMonths),
+      height: Number(m.height),
+    }))
+    .filter(
+      (m) =>
+        Number.isFinite(m.ageMonths) &&
+        Number.isFinite(m.height) &&
+        m.height > 0
+    )
+    .sort((a, b) => a.ageMonths - b.ageMonths);
+
+  const ageSet = new Set<number>();
+
+  for (const row of normalizedWho) {
+    ageSet.add(row.ageMonths);
+  }
+
+  for (const m of normalizedChild) {
+    ageSet.add(m.ageMonths);
+  }
+
+  const mergedAges = Array.from(ageSet).sort((a, b) => a - b);
+
+  return mergedAges.map((ageMonths) => {
+    const whoRow = getNearestWhoRow(normalizedWho, ageMonths);
+    const childPoint =
+      normalizedChild.find((m) => m.ageMonths === ageMonths) ?? null;
+
+    return {
+      ageMonths,
+      p3: whoRow?.p3 ?? 0,
+      p15: whoRow?.p15 ?? 0,
+      p50: whoRow?.p50 ?? 0,
+      p85: whoRow?.p85 ?? 0,
+      p97: whoRow?.p97 ?? 0,
+      childHeight: childPoint ? childPoint.height : null,
+    };
+  });
+}
+
 export function getHeightPercentileBand(
   height: number,
   whoRow: WhoHeightPoint | null
 ): string {
   if (!whoRow || !Number.isFinite(height)) return "—";
 
-  if (height < whoRow.p3) return "<3rd";
-  if (height < whoRow.p15) return "3rd–15th";
-  if (height < whoRow.p50) return "15th–50th";
-  if (height < whoRow.p85) return "50th–85th";
-  if (height < whoRow.p97) return "85th–97th";
+  const row = normalizeWhoRow(whoRow);
+
+  if (height < row.p3) return "<3rd";
+  if (height < row.p15) return "3rd–15th";
+  if (height < row.p50) return "15th–50th";
+  if (height < row.p85) return "50th–85th";
+  if (height < row.p97) return "85th–97th";
   return ">97th";
 }
