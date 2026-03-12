@@ -170,10 +170,41 @@ export function getHeightPercentileBand(
 
   const row = normalizeWhoRow(whoRow);
 
+  
+
   if (height < row.p3) return "<3rd";
   if (height < row.p15) return "3rd–15th";
   if (height < row.p50) return "15th–50th";
   if (height < row.p85) return "50th–85th";
   if (height < row.p97) return "85th–97th";
   return ">97th";
+}
+
+export function getHeightZScore(
+  height: number,
+  whoRow: WhoHeightPoint | null
+): number | null {
+  if (!whoRow || !Number.isFinite(height)) return null;
+
+  const row = normalizeWhoRow(whoRow);
+
+  // приблизительное стандартное отклонение
+  const sd = (row.p97 - row.p3) / 4;
+
+  if (!Number.isFinite(sd) || sd === 0) return null;
+
+  const z = (height - row.p50) / sd;
+
+  return Number(z.toFixed(2));
+}
+
+export function getHeightZScoreStatus(z: number | null): string {
+  if (z === null) return "—";
+
+  if (z < -3) return "Severe stunting";
+  if (z < -2) return "Moderate stunting";
+  if (z > 3) return "Very tall";
+  if (z > 2) return "Tall";
+
+  return "Normal";
 }
