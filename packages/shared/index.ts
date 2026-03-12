@@ -11,6 +11,6 @@ export type Measurement = {
   id: string;
   childId: string;
   date: Date;
-  height: 188; // рост в см
-  weight: 54; // вес в кг
+  height: number; // рост в см
+  weight: number; // вес в кг
 };
