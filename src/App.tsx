@@ -259,7 +259,7 @@ export default function App() {
       const created = await createChild({
         name: childName.trim(),
         gender: childGender,
-        birthDate: new Date(childBirthDate),
+        birthDate: childBirthDate,
       });
 
       const updatedChildren = [...children, created];

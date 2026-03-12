@@ -6,12 +6,21 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 type ChildDTO = Omit<Child, "birthDate"> & { birthDate: string };
 type MeasurementDTO = Omit<Measurement, "date"> & { date: string };
 
+function parseApiDate(value: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  return new Date(value);
+}
+
 function toChild(dto: ChildDTO): Child {
-  return { ...dto, birthDate: new Date(dto.birthDate) };
+  return { ...dto, birthDate: parseApiDate(dto.birthDate) };
 }
 
 function toMeasurement(dto: MeasurementDTO): Measurement {
-  return { ...dto, date: new Date(dto.date) };
+  return { ...dto, date: parseApiDate(dto.date) };
 }
 
 export async function getChildren(): Promise<Child[]> {
@@ -24,7 +33,7 @@ export async function getChildren(): Promise<Child[]> {
 export async function createChild(input: {
   name: string;
   gender: "male" | "female";
-  birthDate: Date;
+  birthDate: string;
 }): Promise<Child> {
   const res = await fetch(`${API_BASE}/children`, {
     method: "POST",
@@ -32,7 +41,7 @@ export async function createChild(input: {
     body: JSON.stringify({
       name: input.name,
       gender: input.gender,
-      birthDate: input.birthDate.toISOString(),
+      birthDate: input.birthDate,
     }),
   });
 
