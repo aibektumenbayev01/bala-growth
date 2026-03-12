@@ -76,20 +76,35 @@ function normalizeDateInputValue(value: string): string {
     return trimmed;
   }
 
-  const localizedMatch = trimmed.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
-  if (!localizedMatch) {
-    return trimmed;
+  const parts = trimmed.match(/\d+/g);
+  if (!parts || parts.length !== 3) {
+    return "";
   }
 
-  const [, day, month, year] = localizedMatch;
-  const iso = `${year}-${month}-${day}`;
-  const parsed = new Date(`${iso}T00:00:00`);
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (parts[0].length === 4) {
+    year = Number(parts[0]);
+    month = Number(parts[1]);
+    day = Number(parts[2]);
+  } else if (parts[2].length === 4) {
+    day = Number(parts[0]);
+    month = Number(parts[1]);
+    year = Number(parts[2]);
+  } else {
+    return "";
+  }
+
+  const iso = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const parsed = new Date(Date.UTC(year, month - 1, day));
 
   if (
     Number.isNaN(parsed.getTime()) ||
-    parsed.getFullYear() !== Number(year) ||
-    parsed.getMonth() + 1 !== Number(month) ||
-    parsed.getDate() !== Number(day)
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() + 1 !== month ||
+    parsed.getUTCDate() !== day
   ) {
     return "";
   }
@@ -551,7 +566,7 @@ export default function App() {
 
                   <input
                     type="date"
-                    value={childBirthDate}
+                    value={ISO_DATE_RE.test(childBirthDate) ? childBirthDate : ""}
                     onChange={(e) =>
                       setChildBirthDate(normalizeDateInputValue(e.target.value))
                     }
