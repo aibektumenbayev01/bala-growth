@@ -48,13 +48,16 @@ export function getAgeInMonths(
 ): number {
   const birthDate = toDate(birthDateValue);
   const measureDate = toDate(measureDateValue);
+  if (Number.isNaN(birthDate.getTime()) || Number.isNaN(measureDate.getTime())) {
+    return 0;
+  }
 
-  const years = measureDate.getFullYear() - birthDate.getFullYear();
-  const months = measureDate.getMonth() - birthDate.getMonth();
+  const years = measureDate.getUTCFullYear() - birthDate.getUTCFullYear();
+  const months = measureDate.getUTCMonth() - birthDate.getUTCMonth();
 
   let total = years * 12 + months;
 
-  if (measureDate.getDate() < birthDate.getDate()) {
+  if (measureDate.getUTCDate() < birthDate.getUTCDate()) {
     total -= 1;
   }
 
@@ -201,10 +204,10 @@ export function getHeightZScore(
 export function getHeightZScoreStatus(z: number | null): string {
   if (z === null) return "—";
 
-  if (z < -3) return "Severe stunting";
-  if (z < -2) return "Moderate stunting";
-  if (z > 3) return "Very tall";
-  if (z > 2) return "Tall";
+  if (z < -3) return "Тяжёлая низкорослость";
+  if (z < -2) return "Умеренная низкорослость";
+  if (z > 3) return "Существенно выше нормы";
+  if (z > 2) return "Выше нормы";
 
-  return "Normal";
+  return "В пределах нормы";
 }

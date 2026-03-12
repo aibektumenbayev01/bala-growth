@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import type { Child, Measurement } from "@bala/shared";
 import {
   Baby,
@@ -55,13 +55,21 @@ function safeNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function parseDateInputAsUtc(dateInput: string): Date {
+  return new Date(`${dateInput}T00:00:00.000Z`);
+}
+
+function getTodayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function formatDate(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
 
   return `${day}.${month}.${year}`;
 }
@@ -70,6 +78,11 @@ function formatAge(ageMonths: number): string {
   const years = Math.floor(ageMonths / 12);
   const months = ageMonths % 12;
   return `${years} г ${months} мес`;
+}
+
+function formatZScore(value: number | null): string {
+  if (value === null) return "—";
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
 function getGenderLabel(gender: Gender): string {
@@ -121,7 +134,7 @@ function getAnalysisText(
 }
 
 type StatCardProps = {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   value: string;
   subtitle?: string;
@@ -204,37 +217,26 @@ export default function App() {
   const [childName, setChildName] = useState("");
   const [childGender, setChildGender] = useState<Gender>("male");
   const [childBirthDate, setChildBirthDate] = useState("");
+  const [childFormError, setChildFormError] = useState<string | null>(null);
 
-  const [measurementDate, setMeasurementDate] = useState("");
+  const [measurementDate, setMeasurementDate] = useState(getTodayIsoDate());
   const [measurementHeight, setMeasurementHeight] = useState("");
   const [measurementWeight, setMeasurementWeight] = useState("");
 
-  useEffect(() => {
-    void loadChildren();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedChildId) return;
-    void loadMeasurements(selectedChildId);
-  }, [selectedChildId]);
-
-  async function loadChildren() {
+  const loadChildren = useCallback(async () => {
     try {
       setLoadingChildren(true);
       const data = await getChildren();
       setChildren(data);
-
-      if (data.length > 0 && !selectedChildId) {
-        setSelectedChildId(data[0].id);
-      }
+      setSelectedChildId((prev) => prev ?? data[0]?.id ?? null);
     } catch (error) {
       console.error("Failed to load children:", error);
     } finally {
       setLoadingChildren(false);
     }
-  }
+  }, []);
 
-  async function loadMeasurements(childId: string) {
+  const loadMeasurements = useCallback(async (childId: string) => {
     try {
       setLoadingMeasurements(true);
       const data = await getMeasurements(childId);
@@ -247,19 +249,44 @@ export default function App() {
     } finally {
       setLoadingMeasurements(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void loadChildren();
+  }, [loadChildren]);
+
+  useEffect(() => {
+    if (!selectedChildId) return;
+    void loadMeasurements(selectedChildId);
+  }, [selectedChildId, loadMeasurements]);
 
   async function handleCreateChild(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!childName.trim() || !childBirthDate) return;
+    const trimmedName = childName.trim();
+    if (!trimmedName || !childBirthDate) {
+      setChildFormError("Заполни имя ребёнка и дату рождения.");
+      return;
+    }
+
+    const birthDate = parseDateInputAsUtc(childBirthDate);
+    if (Number.isNaN(birthDate.getTime())) {
+      setChildFormError("Некорректная дата рождения.");
+      return;
+    }
+
+    if (birthDate.getTime() > parseDateInputAsUtc(getTodayIsoDate()).getTime()) {
+      setChildFormError("Дата рождения не может быть в будущем.");
+      return;
+    }
 
     try {
       setSubmittingChild(true);
+      setChildFormError(null);
 
       const created = await createChild({
-        name: childName.trim(),
+        name: trimmedName,
         gender: childGender,
-        birthDate: new Date(childBirthDate),
+        birthDate,
       });
 
       const updatedChildren = [...children, created];
@@ -272,6 +299,7 @@ export default function App() {
       setChildBirthDate("");
     } catch (error) {
       console.error("Failed to create child:", error);
+      setChildFormError("Не удалось сохранить профиль. Попробуй ещё раз.");
     } finally {
       setSubmittingChild(false);
     }
@@ -281,16 +309,30 @@ export default function App() {
     event.preventDefault();
     if (!selectedChildId || !measurementDate || !measurementHeight || !measurementWeight) return;
 
+    const parsedDate = parseDateInputAsUtc(measurementDate);
+    const parsedHeight = Number(measurementHeight);
+    const parsedWeight = Number(measurementWeight);
+
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      !Number.isFinite(parsedHeight) ||
+      !Number.isFinite(parsedWeight) ||
+      parsedHeight <= 0 ||
+      parsedWeight <= 0
+    ) {
+      return;
+    }
+
     try {
       setSubmittingMeasurement(true);
 
       await createMeasurement(selectedChildId, {
-        date: new Date(measurementDate),
-        height: Number(measurementHeight),
-        weight: Number(measurementWeight),
+        date: parsedDate,
+        height: parsedHeight,
+        weight: parsedWeight,
       });
 
-      setMeasurementDate("");
+      setMeasurementDate(getTodayIsoDate());
       setMeasurementHeight("");
       setMeasurementWeight("");
 
@@ -414,7 +456,10 @@ export default function App() {
 
           <button
             type="button"
-            onClick={() => setIsCreateChildOpen((prev) => !prev)}
+            onClick={() => {
+              setChildFormError(null);
+              setIsCreateChildOpen(true);
+            }}
             className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-600"
           >
             <PlusCircle size={18} />
@@ -499,55 +544,11 @@ export default function App() {
                 историю и графики WHO в одном месте.
               </div>
 
-              {isCreateChildOpen ? (
-                <form onSubmit={handleCreateChild} className="mt-8 grid gap-4 md:grid-cols-3">
-                  <input
-                    value={childName}
-                    onChange={(e) => setChildName(e.target.value)}
-                    placeholder="Имя ребёнка"
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none ring-0 transition focus:border-cyan-400"
-                  />
-
-                  <select
-                    value={childGender}
-                    onChange={(e) => setChildGender(e.target.value as Gender)}
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
-                  >
-                    <option value="male">Мальчик</option>
-                    <option value="female">Девочка</option>
-                  </select>
-
-                  <input
-                    type="date"
-                    value={childBirthDate}
-                    onChange={(e) => setChildBirthDate(e.target.value)}
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
-                  />
-
-                  <div className="md:col-span-3 flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={submittingChild}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
-                    >
-                      {submittingChild ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <PlusCircle size={18} />
-                      )}
-                      Сохранить
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsCreateChildOpen(false)}
-                      className="rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                </form>
-              ) : null}
+              <div className="mt-8 rounded-2xl border border-cyan-100 bg-cyan-50 p-4 text-sm leading-6 text-slate-600">
+                Для добавления нового профиля нажми кнопку{" "}
+                <span className="font-semibold text-cyan-700">«Добавить ребёнка»</span> в
+                правом верхнем углу.
+              </div>
 
               <div className="mt-10 text-lg font-semibold text-slate-900">Профили детей</div>
 
@@ -663,7 +664,7 @@ export default function App() {
                 <StatCard
                   icon={<Activity size={22} />}
                   title="Height Z-Score"
-                  value={derived?.zScore !== null && derived?.zScore !== undefined ? String(derived.zScore) : "—"}
+                  value={formatZScore(derived?.zScore ?? null)}
                   subtitle={derived?.zScoreStatus ?? "—"}
                 />
 
@@ -724,7 +725,7 @@ export default function App() {
                       </div>
 
                       <div className="mt-4 text-lg leading-8 text-slate-600">
-                        Z-score: {derived.zScore ?? "—"}, перцентиль: {derived.percentile},
+                        Z-score: {formatZScore(derived.zScore)}, перцентиль: {derived.percentile},
                         темп роста: {derived.annualGrowth ?? "—"} см/год.
                       </div>
 
@@ -745,7 +746,7 @@ export default function App() {
                         <div className="flex items-center justify-between gap-4">
                           <span>Z-score</span>
                           <span className="font-bold text-slate-900">
-                            {derived.zScore ?? "—"}
+                            {formatZScore(derived.zScore)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
@@ -837,12 +838,14 @@ export default function App() {
                       type="date"
                       value={measurementDate}
                       onChange={(e) => setMeasurementDate(e.target.value)}
+                      max={getTodayIsoDate()}
                       className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
                     />
 
                     <input
                       type="number"
                       step="0.1"
+                      min="1"
                       value={measurementHeight}
                       onChange={(e) => setMeasurementHeight(e.target.value)}
                       placeholder="Рост (см)"
@@ -852,6 +855,7 @@ export default function App() {
                     <input
                       type="number"
                       step="0.1"
+                      min="0.1"
                       value={measurementWeight}
                       onChange={(e) => setMeasurementWeight(e.target.value)}
                       placeholder="Вес (кг)"
@@ -952,6 +956,108 @@ export default function App() {
           )}
         </section>
       </main>
+
+      {isCreateChildOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => {
+            setIsCreateChildOpen(false);
+            setChildFormError(null);
+          }}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-3xl font-bold text-slate-900">Новый профиль ребёнка</div>
+                <div className="mt-2 text-base text-slate-500">
+                  Добавь имя, пол и дату рождения для старта мониторинга.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateChildOpen(false);
+                  setChildFormError(null);
+                }}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateChild} className="grid gap-4 md:grid-cols-2">
+              <label className="md:col-span-2">
+                <div className="mb-2 text-sm font-semibold text-slate-500">Имя ребёнка</div>
+                <input
+                  value={childName}
+                  onChange={(e) => setChildName(e.target.value)}
+                  placeholder="Например, Айару"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none ring-0 transition focus:border-cyan-400"
+                />
+              </label>
+
+              <label>
+                <div className="mb-2 text-sm font-semibold text-slate-500">Пол</div>
+                <select
+                  value={childGender}
+                  onChange={(e) => setChildGender(e.target.value as Gender)}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                >
+                  <option value="male">Мальчик</option>
+                  <option value="female">Девочка</option>
+                </select>
+              </label>
+
+              <label>
+                <div className="mb-2 text-sm font-semibold text-slate-500">Дата рождения</div>
+                <input
+                  type="date"
+                  value={childBirthDate}
+                  max={getTodayIsoDate()}
+                  onChange={(e) => setChildBirthDate(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                />
+              </label>
+
+              {childFormError ? (
+                <div className="md:col-span-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                  {childFormError}
+                </div>
+              ) : null}
+
+              <div className="md:col-span-2 mt-1 flex gap-3">
+                <button
+                  type="submit"
+                  disabled={submittingChild}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
+                >
+                  {submittingChild ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <PlusCircle size={18} />
+                  )}
+                  Сохранить профиль
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateChildOpen(false);
+                    setChildFormError(null);
+                  }}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
