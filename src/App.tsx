@@ -66,6 +66,37 @@ function formatDate(value: string | Date): string {
   return `${day}.${month}.${year}`;
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function normalizeDateInputValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  if (ISO_DATE_RE.test(trimmed)) {
+    return trimmed;
+  }
+
+  const localizedMatch = trimmed.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (!localizedMatch) {
+    return trimmed;
+  }
+
+  const [, day, month, year] = localizedMatch;
+  const iso = `${year}-${month}-${day}`;
+  const parsed = new Date(`${iso}T00:00:00`);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== Number(year) ||
+    parsed.getMonth() + 1 !== Number(month) ||
+    parsed.getDate() !== Number(day)
+  ) {
+    return "";
+  }
+
+  return iso;
+}
+
 function formatAge(ageMonths: number): string {
   const years = Math.floor(ageMonths / 12);
   const months = ageMonths % 12;
@@ -251,7 +282,8 @@ export default function App() {
 
   async function handleCreateChild(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!childName.trim() || !childBirthDate) return;
+    const normalizedBirthDate = normalizeDateInputValue(childBirthDate);
+    if (!childName.trim() || !ISO_DATE_RE.test(normalizedBirthDate)) return;
 
     try {
       setSubmittingChild(true);
@@ -259,7 +291,7 @@ export default function App() {
       const created = await createChild({
         name: childName.trim(),
         gender: childGender,
-        birthDate: childBirthDate,
+        birthDate: normalizedBirthDate,
       });
 
       const updatedChildren = [...children, created];
@@ -520,7 +552,9 @@ export default function App() {
                   <input
                     type="date"
                     value={childBirthDate}
-                    onChange={(e) => setChildBirthDate(e.target.value)}
+                    onChange={(e) =>
+                      setChildBirthDate(normalizeDateInputValue(e.target.value))
+                    }
                     className="rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
                   />
 
