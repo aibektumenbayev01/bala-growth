@@ -26,3 +26,5 @@ dist-ssr
 *.sln
 *.sw?
 >>>>>>> origin/main
+node_modules/
+.DS_Store
