@@ -107,6 +107,25 @@ app.delete("/measurements/:id", async (req, res) => {
   }
 });
 
+app.delete("/children/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.measurement.deleteMany({
+      where: { childId: id },
+    });
+
+    await prisma.child.delete({
+      where: { id },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error("Delete child error:", error);
+    res.status(500).json({ error: "Не удалось удалить профиль ребёнка" });
+  }
+});
+
 process.on("SIGINT", async () => {
   await prisma.$disconnect();
   process.exit(0);
