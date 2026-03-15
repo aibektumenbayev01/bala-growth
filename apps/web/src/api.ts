@@ -84,3 +84,11 @@ export async function createMeasurement(
   const dto: MeasurementDTO = await res.json();
   return toMeasurement(dto);
 }
+
+export async function deleteChild(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/children/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) throw new Error("Failed to delete child");
+}

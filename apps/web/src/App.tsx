@@ -31,6 +31,7 @@ import {
   getMeasurements,
   createMeasurement,
   deleteMeasurement,
+  deleteChild,
 } from "./api";
 
 import {
@@ -47,8 +48,6 @@ import { hfaBoys5to19 } from "./who/hfa-boys-5-19";
 import { hfaGirls5to19 } from "./who/hfa-girls-5-19";
 
 type Gender = "male" | "female";
-
-
 
 function safeNumber(value: unknown): number {
   const n = Number(value);
@@ -129,8 +128,8 @@ function getAnalysisText(
     description: "Показатели роста выглядят стабильными относительно WHO-референсов.",
     recommendation:
       "Продолжайте регулярный мониторинг роста и веса каждые 3–6 месяцев.",
-    level: "normal",
-  };
+      level: "normal",
+    };
 }
 
 type StatCardProps = {
@@ -142,19 +141,19 @@ type StatCardProps = {
 
 function StatCard({ icon, title, value, subtitle }: StatCardProps) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-50 text-cyan-600">
         {icon}
       </div>
 
-      <div className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
         {title}
       </div>
 
-      <div className="mt-2 text-4xl font-bold text-slate-900">{value}</div>
+      <div className="mt-2 text-2xl font-bold text-slate-900">{value}</div>
 
       {subtitle ? (
-        <div className="mt-3 text-sm leading-6 text-slate-500">{subtitle}</div>
+        <div className="mt-2 text-sm leading-5 text-slate-500">{subtitle}</div>
       ) : null}
     </div>
   );
@@ -216,7 +215,7 @@ export default function App() {
 
   const [childName, setChildName] = useState("");
   const [childGender, setChildGender] = useState<Gender>("male");
-  const [childBirthDate, setChildBirthDate] = useState("");
+  const [newBirthDate, setNewBirthDate] = useState("");
   const [childFormError, setChildFormError] = useState<string | null>(null);
 
   const [measurementDate, setMeasurementDate] = useState(getTodayIsoDate());
@@ -256,19 +255,26 @@ export default function App() {
   }, [loadChildren]);
 
   useEffect(() => {
-    if (!selectedChildId) return;
+    if (!selectedChildId) {
+      setMeasurements([]);
+      return;
+    }
+
     void loadMeasurements(selectedChildId);
   }, [selectedChildId, loadMeasurements]);
 
   async function handleCreateChild(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     const trimmedName = childName.trim();
-    if (!trimmedName || !childBirthDate) {
+
+    if (!trimmedName || !newBirthDate) {
       setChildFormError("Заполни имя ребёнка и дату рождения.");
       return;
     }
 
-    const birthDate = parseDateInputAsUtc(childBirthDate);
+    const birthDate = parseDateInputAsUtc(newBirthDate);
+
     if (Number.isNaN(birthDate.getTime())) {
       setChildFormError("Некорректная дата рождения.");
       return;
@@ -289,14 +295,13 @@ export default function App() {
         birthDate,
       });
 
-      const updatedChildren = [...children, created];
-      setChildren(updatedChildren);
+      setChildren((prev) => [...prev, created]);
       setSelectedChildId(created.id);
       setIsCreateChildOpen(false);
 
       setChildName("");
       setChildGender("male");
-      setChildBirthDate("");
+      setNewBirthDate("");
     } catch (error) {
       console.error("Failed to create child:", error);
       setChildFormError("Не удалось сохранить профиль. Попробуй ещё раз.");
@@ -307,7 +312,10 @@ export default function App() {
 
   async function handleCreateMeasurement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedChildId || !measurementDate || !measurementHeight || !measurementWeight) return;
+
+    if (!selectedChildId || !measurementDate || !measurementHeight || !measurementWeight) {
+      return;
+    }
 
     const parsedDate = parseDateInputAsUtc(measurementDate);
     const parsedHeight = Number(measurementHeight);
@@ -344,6 +352,29 @@ export default function App() {
     }
   }
 
+  async function handleDeleteChild(childId: string, childName: string) {
+    const confirmed = window.confirm(
+      `Удалить профиль "${childName}"? Это также удалит все измерения этого ребёнка.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteChild(childId);
+
+      const updatedChildren = children.filter((child) => child.id !== childId);
+      setChildren(updatedChildren);
+
+      if (selectedChildId === childId) {
+        setMeasurements([]);
+        setSelectedChildId(updatedChildren[0]?.id ?? null);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Не удалось удалить профиль ребёнка");
+    }
+  }
+
   async function handleDeleteMeasurement(id: string) {
     if (!selectedChildId) return;
 
@@ -369,9 +400,13 @@ export default function App() {
   const childMeasurements = useMemo(() => {
     if (!selectedChild) return [];
 
+    const selectedMeasurements = measurements.filter(
+      (m) => m.childId === selectedChild.id
+    );
+
     return prepareChildHeightMeasurements(
       selectedChild.birthDate,
-      measurements.map((m) => ({
+      selectedMeasurements.map((m) => ({
         date: m.date,
         height: safeNumber(m.height),
       }))
@@ -468,9 +503,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-6 py-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <main className="mx-auto grid max-w-[1280px] grid-cols-1 gap-6 px-5 py-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
               Dashboard
             </div>
@@ -492,19 +527,19 @@ export default function App() {
                       key={child.id}
                       type="button"
                       onClick={() => setSelectedChildId(child.id)}
-                      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                         selectedChildId === child.id
                           ? "border-cyan-200 bg-cyan-50"
                           : "border-slate-200 bg-white hover:border-slate-300"
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
+                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
                           <Baby size={18} />
                         </div>
 
                         <div className="min-w-0">
-                          <div className="truncate text-lg font-semibold text-slate-900">
+                          <div className="truncate text-base font-semibold text-slate-900">
                             {child.name}
                           </div>
                           <div className="text-sm text-slate-500">
@@ -568,27 +603,35 @@ export default function App() {
 
                         <div>
                           <div className="text-2xl font-bold text-slate-900">{child.name}</div>
-                          <div className="text-sm uppercase tracking-wide text-slate-400">
-                            {getGenderLabel(child.gender as Gender)}
+                          <div className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                            {child.gender === "male" ? "Мальчик" : "Девочка"}
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-5 space-y-2 text-sm text-slate-500">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} />
-                          {formatDate(child.birthDate)}
-                        </div>
+                      <div className="mt-4 space-y-2 text-slate-500">
+                        <div>{formatDate(child.birthDate)}</div>
                         <div>{formatAge(ageMonths)}</div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setSelectedChildId(child.id)}
-                        className="mt-6 w-full rounded-2xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        Открыть профиль
-                      </button>
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedChildId(child.id)}
+                          className="flex-1 rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Открыть профиль
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteChild(child.id, child.name)}
+                          className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-4 py-3 text-red-600 transition hover:bg-red-50"
+                          title="Удалить профиль"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -596,15 +639,15 @@ export default function App() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-5">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-cyan-100 bg-cyan-50 text-cyan-600">
-                    <User size={36} />
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-cyan-100 bg-cyan-50 text-cyan-600">
+                    <User size={28} />
                   </div>
 
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h1 className="text-4xl font-bold text-slate-900">{selectedChild.name}</h1>
+                      <h1 className="text-3xl font-bold text-slate-900">{selectedChild.name}</h1>
 
                       {derived && derived.analysis.level === "warning" ? (
                         <span className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
@@ -614,7 +657,7 @@ export default function App() {
                       ) : null}
                     </div>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-5 text-slate-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-4 text-slate-500">
                       <div className="flex items-center gap-2">
                         <Calendar size={16} />
                         {formatAge(selectedChildAgeMonths)}
@@ -635,7 +678,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <StatCard
                   icon={<Ruler size={22} />}
                   title="Current Height"
@@ -689,13 +732,13 @@ export default function App() {
 
               {derived ? (
                 <div
-                  className={`rounded-3xl border p-6 shadow-sm ${
+                  className={`rounded-2xl border p-5 shadow-sm ${
                     derived.analysis.level === "warning"
                       ? "border-red-200 bg-red-50"
                       : "border-emerald-200 bg-emerald-50"
                   }`}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-6">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
                     <div className="max-w-3xl">
                       <div className="flex items-center gap-3">
                         <AlertTriangle
@@ -706,7 +749,7 @@ export default function App() {
                               : "text-emerald-500"
                           }
                         />
-                        <div className="text-3xl font-bold text-slate-900">
+                        <div className="text-2xl font-bold text-slate-900">
                           Результат анализа
                         </div>
                         <span
@@ -720,16 +763,16 @@ export default function App() {
                         </span>
                       </div>
 
-                      <div className="mt-5 text-2xl font-semibold text-slate-900">
+                      <div className="mt-4 text-xl font-semibold text-slate-900">
                         {derived.analysis.description}
                       </div>
 
-                      <div className="mt-4 text-lg leading-8 text-slate-600">
+                      <div className="mt-3 text-lg leading-7 text-slate-600">
                         Z-score: {formatZScore(derived.zScore)}, перцентиль: {derived.percentile},
                         темп роста: {derived.annualGrowth ?? "—"} см/год.
                       </div>
 
-                      <div className="mt-6 rounded-2xl bg-white/70 p-5 text-base leading-7 text-slate-700">
+                      <div className="mt-4 rounded-xl bg-white/70 p-4 text-sm leading-6 text-slate-700">
                         <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
                           Рекомендация
                         </div>
@@ -737,7 +780,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="min-w-[280px] rounded-2xl bg-white/70 p-5">
+                    <div className="rounded-xl bg-white/70 p-4">
                       <div className="space-y-3 text-base text-slate-600">
                         <div className="flex items-center justify-between gap-4">
                           <span>Перцентиль роста</span>
@@ -769,19 +812,19 @@ export default function App() {
                 </div>
               ) : null}
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
                   <div>
-                    <div className="text-3xl font-bold text-slate-900">
+                    <div className="text-2xl font-bold text-slate-900">
                       WHO Height-for-age Chart
                     </div>
-                    <div className="mt-2 text-lg text-slate-500">
+                    <div className="mt-1 text-lg text-slate-500">
                       WHO reference percentiles + рост ребёнка
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 h-[420px] w-full rounded-3xl border border-slate-100 bg-slate-50 p-4">
+                <div className="mt-4 h-[300px] w-full rounded-2xl border border-slate-100 bg-slate-50 p-3">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={true} />
@@ -814,14 +857,14 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="text-3xl font-bold text-slate-900">
+                      <div className="text-2xl font-bold text-slate-900">
                         Добавить измерение
                       </div>
-                      <div className="mt-2 text-lg leading-7 text-slate-500">
+                      <div className="mt-1 text-lg leading-6 text-slate-500">
                         Дата, рост и вес сохраняются в базу.
                       </div>
                     </div>
@@ -833,13 +876,13 @@ export default function App() {
                     ) : null}
                   </div>
 
-                  <form onSubmit={handleCreateMeasurement} className="mt-6 space-y-4">
+                  <form onSubmit={handleCreateMeasurement} className="mt-5 space-y-3">
                     <input
                       type="date"
                       value={measurementDate}
                       onChange={(e) => setMeasurementDate(e.target.value)}
                       max={getTodayIsoDate()}
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition focus:border-cyan-400"
                     />
 
                     <input
@@ -849,7 +892,7 @@ export default function App() {
                       value={measurementHeight}
                       onChange={(e) => setMeasurementHeight(e.target.value)}
                       placeholder="Рост (см)"
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition focus:border-cyan-400"
                     />
 
                     <input
@@ -859,13 +902,13 @@ export default function App() {
                       value={measurementWeight}
                       onChange={(e) => setMeasurementWeight(e.target.value)}
                       placeholder="Вес (кг)"
-                      className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition focus:border-cyan-400"
                     />
 
                     <button
                       type="submit"
                       disabled={submittingMeasurement}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
                     >
                       {submittingMeasurement ? (
                         <Loader2 size={18} className="animate-spin" />
@@ -891,9 +934,9 @@ export default function App() {
                   ) : null}
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-5 flex items-center justify-between">
-                    <div className="text-3xl font-bold text-slate-900">
+                    <div className="text-2xl font-bold text-slate-900">
                       История измерений
                     </div>
                     <div className="text-sm font-semibold text-slate-400">
@@ -918,15 +961,15 @@ export default function App() {
                         .map((measurement) => (
                           <div
                             key={measurement.id}
-                            className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-4"
+                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3"
                           >
                             <div className="min-w-0">
-                              <div className="text-lg font-medium text-slate-500">
+                              <div className="text-base font-medium text-slate-500">
                                 {formatDate(measurement.date)}
                               </div>
                             </div>
 
-                            <div className="text-xl font-bold text-slate-900">
+                            <div className="text-lg font-bold text-slate-900">
                               {safeNumber(measurement.height)} см
                             </div>
 
@@ -938,7 +981,7 @@ export default function App() {
                               type="button"
                               onClick={() => void handleDeleteMeasurement(measurement.id)}
                               disabled={deletingMeasurementId === measurement.id}
-                              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-red-200 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                              className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
                             >
                               {deletingMeasurementId === measurement.id ? (
                                 <Loader2 size={18} className="animate-spin" />
@@ -971,7 +1014,7 @@ export default function App() {
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <div className="text-3xl font-bold text-slate-900">Новый профиль ребёнка</div>
+                <div className="text-2xl font-bold text-slate-900">Новый профиль ребёнка</div>
                 <div className="mt-2 text-base text-slate-500">
                   Добавь имя, пол и дату рождения для старта мониторинга.
                 </div>
@@ -996,7 +1039,7 @@ export default function App() {
                   value={childName}
                   onChange={(e) => setChildName(e.target.value)}
                   placeholder="Например, Айару"
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none ring-0 transition focus:border-cyan-400"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-cyan-400"
                 />
               </label>
 
@@ -1005,7 +1048,7 @@ export default function App() {
                 <select
                   value={childGender}
                   onChange={(e) => setChildGender(e.target.value as Gender)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-cyan-400"
                 >
                   <option value="male">Мальчик</option>
                   <option value="female">Девочка</option>
@@ -1016,10 +1059,10 @@ export default function App() {
                 <div className="mb-2 text-sm font-semibold text-slate-500">Дата рождения</div>
                 <input
                   type="date"
-                  value={childBirthDate}
+                  value={newBirthDate}
                   max={getTodayIsoDate()}
-                  onChange={(e) => setChildBirthDate(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                  onChange={(e) => setNewBirthDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-cyan-400"
                 />
               </label>
 
