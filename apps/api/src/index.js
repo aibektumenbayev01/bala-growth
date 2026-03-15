@@ -111,6 +111,21 @@ app.delete("/children/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
+    await prisma.child.delete({
+      where: { id },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    console.error("Failed to delete child:", error);
+    res.status(500).json({ error: "Failed to delete child" });
+  }
+});
+
+app.delete("/children/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
     await prisma.measurement.deleteMany({
       where: { childId: id },
     });
