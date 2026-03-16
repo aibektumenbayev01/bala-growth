@@ -12,7 +12,7 @@ This project was built as a portfolio pet-project to demonstrate full-stack deve
 
 ### Application Interface
 
-![Dashboard](docs/dashboard.png)
+![Dashboard](docs:dashboard.png)
 
 ![Child Profile](docs/profile.png)
 
