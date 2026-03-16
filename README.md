@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# Bala Growth
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Monorepo with:
 
-Currently, two official plugins are available:
+- `apps/web` - React + TypeScript + Vite frontend
+- `apps/api` - Express + Prisma backend
+- `packages/shared` - shared types (`@bala/shared`)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Requirements
 
-## React Compiler
+- Node.js 20+
+- `pnpm` (the repo is configured for pnpm workspaces)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Quick start
 
-## Expanding the ESLint configuration
+Run all commands from repository root:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev:web
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+For API (in another terminal):
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+pnpm dev:api
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Common clone/setup issue (module not found)
+
+If you see errors like:
+
+- `Cannot find module '@bala/shared'`
+- `Cannot find module 'lucide-react'`
+- `Cannot find module 'recharts'`
+- `Cannot find type definition file for 'vite/client'`
+
+it usually means dependencies were not installed with `pnpm` from the repo root.
+
+### Fix
+
+```bash
+rm -rf node_modules apps/web/node_modules apps/api/node_modules
+pnpm install
+```
+
+If you previously ran `npm install`, delete generated npm artifacts and reinstall with pnpm:
+
+```bash
+rm -f package-lock.json apps/web/package-lock.json apps/api/package-lock.json
+pnpm install
 ```
