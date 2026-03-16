@@ -1,31 +1,45 @@
 # Bala Growth
- 
-Pet-project для портфолио Junior Software Engineer.  
-Приложение для мониторинга роста детей: профили, измерения (рост/вес), графики WHO и базовая аналитика.
- 
+
+Full-stack web application for monitoring children's growth using WHO growth charts.
+
+Users can create child profiles, record height and weight measurements, and visualize growth trends compared with WHO percentile curves.
+
+This project was built as a portfolio pet-project to demonstrate full-stack development skills.
+
 ---
- 
-## Project Goal
- 
-Показать практические full-stack навыки:
- 
-- монорепо на `pnpm workspaces`
-- frontend на React + TypeScript + Vite
-- backend API на Express + Prisma
-- работа с SQLite и миграциями Prisma
-- реальный процесс настройки и отладки окружения
- 
----
+
+# Demo
+
+### Application Interface
+
+![Dashboard](docs/dashboard.png)
+
+![Child Profile](docs/profile.png)
+
+![Growth Chart](docs/chart.png)
+
+## About This Project
+
+This project was created as a portfolio application to demonstrate:
+
+- full-stack TypeScript development
+- monorepo architecture
+- REST API design
+- database modeling with Prisma
+- data visualization in React
+
+It simulates a simplified pediatric growth monitoring system.
+
  
 ## Features
- 
-- Создание и просмотр профилей детей
-- Добавление измерений роста и веса
-- Удаление измерений
-- Удаление профиля ребёнка
-- График роста относительно WHO-кривых
-- Базовые вычисления динамики роста
- 
+
+
+- Create and manage child profiles
+- Record height and weight measurements
+- Visualize growth trends using WHO percentile curves
+- Calculate growth metrics and Z-score indicators
+- Delete measurements and profiles
+  
 ---
  
 ## Tech Stack
@@ -49,6 +63,21 @@ Pet-project для портфолио Junior Software Engineer.
 - pnpm workspaces
  
 ---
+
+## Architecture
+
+Monorepo structure using pnpm workspaces.
+
+Frontend communicates with Express API via REST endpoints.
+Shared TypeScript types are stored in `@bala/shared` package.
+
+React (Vite)
+    ↓
+Express API
+    ↓
+Prisma ORM
+    ↓
+SQLite Database
  
 ## Project Structure
  
@@ -107,7 +136,6 @@ pnpm dev
 
 Frontend: ```http://127.0.0.1:5173```
 API healthcheck: ```http://127.0.0.1:3001/health```
-Useful scripts (from repo root)
 
 ## API Endpoints
 
@@ -119,39 +147,11 @@ Useful scripts (from repo root)
 - DELETE /measurements/:id
 - DELETE /children/:id
 
-## Troubleshooting
 
-1) Cannot find module ```@bala/shared / vite/client / lucide-react / recharts```
+## Future Improvements
 
-Обычно зависимости установлены некорректно:
-
-```
-rm -rf node_modules apps/web/node_modules apps/api/node_modules
-pnpm install
-```
-2) Prisma error: Cannot find module '.prisma/client/default'
-
-Сгенерируй Prisma client:
-
-
-```pnpm --filter api exec prisma generate```
-3) Vite не открывается на 5173
-
-Проверь, что порт слушается:
-
-```
-lsof -nP -iTCP:5173 -sTCP:LISTEN
-curl -i http://127.0.0.1:5173
-```
-4) VS Code Debug Terminal мешает запуску
-
-Используй обычный Terminal и отключи: ```Debug: Toggle Auto Attach -> Off```
-
-Roadmap
-
-- Authentication / users
+- Authentication and multi-user support
 - Unit and integration tests
 - Docker setup
-- CI (GitHub Actions: lint + build + test)
-- Улучшение аналитики и алертов
-
+- CI pipeline (GitHub Actions)
+- Improved growth analytics
