@@ -20,6 +20,12 @@ export type GrowthChartPoint = {
   p85: number;
   p97: number;
   childHeight: number | null;
+  predictedHeight: number | null;
+};
+
+export type PredictedHeightPoint = {
+  ageMonths: number;
+  predictedHeight: number;
 };
 
 function toDate(value: string | Date): Date {
@@ -106,7 +112,8 @@ export function getNearestWhoRow(
 
 export function prepareChartData(
   whoData: WhoHeightPoint[],
-  childMeasurements: ChildHeightMeasurementPoint[]
+  childMeasurements: ChildHeightMeasurementPoint[],
+  predictedPoints: PredictedHeightPoint[] = []
 ): GrowthChartPoint[] {
   const normalizedWho = whoData
     .map(normalizeWhoRow)
@@ -136,6 +143,19 @@ export function prepareChartData(
     )
     .sort((a, b) => a.ageMonths - b.ageMonths);
 
+  const normalizedPredicted = predictedPoints
+    .map((point) => ({
+      ageMonths: Number(point.ageMonths),
+      predictedHeight: Number(point.predictedHeight),
+    }))
+    .filter(
+      (point) =>
+        Number.isFinite(point.ageMonths) &&
+        Number.isFinite(point.predictedHeight) &&
+        point.predictedHeight > 0
+    )
+    .sort((a, b) => a.ageMonths - b.ageMonths);
+
   const ageSet = new Set<number>();
 
   for (const row of normalizedWho) {
@@ -146,12 +166,18 @@ export function prepareChartData(
     ageSet.add(m.ageMonths);
   }
 
+  for (const point of normalizedPredicted) {
+    ageSet.add(point.ageMonths);
+  }
+
   const mergedAges = Array.from(ageSet).sort((a, b) => a - b);
 
   return mergedAges.map((ageMonths) => {
     const whoRow = getNearestWhoRow(normalizedWho, ageMonths);
     const childPoint =
       normalizedChild.find((m) => m.ageMonths === ageMonths) ?? null;
+    const predictedPoint =
+      normalizedPredicted.find((m) => m.ageMonths === ageMonths) ?? null;
 
     return {
       ageMonths,
@@ -161,6 +187,7 @@ export function prepareChartData(
       p85: whoRow?.p85 ?? 0,
       p97: whoRow?.p97 ?? 0,
       childHeight: childPoint ? childPoint.height : null,
+      predictedHeight: predictedPoint ? predictedPoint.predictedHeight : null,
     };
   });
 }
