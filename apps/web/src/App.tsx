@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import type { Child, Measurement } from "@bala/shared";
+import type { Child, ChildGrowthInsights, GrowthAnomalyFlag, Measurement } from "@bala/shared";
 import {
   Baby,
   Calendar,
@@ -29,6 +29,7 @@ import {
   getChildren,
   createChild,
   getMeasurements,
+  getChildInsights,
   createMeasurement,
   deleteMeasurement,
   deleteChild,
@@ -128,8 +129,32 @@ function getAnalysisText(
     description: "Показатели роста выглядят стабильными относительно WHO-референсов.",
     recommendation:
       "Продолжайте регулярный мониторинг роста и веса каждые 3–6 месяцев.",
-      level: "normal",
-    };
+    level: "normal",
+  };
+}
+
+function getInsightStatusLabel(status: ChildGrowthInsights["status"]): string {
+  if (status === "requires_attention") return "Requires attention";
+  if (status === "below_expected_growth") return "Below expected growth";
+  return "Normal trend";
+}
+
+function getInsightRiskBadgeClass(riskLevel: ChildGrowthInsights["riskLevel"]): string {
+  if (riskLevel === "requires_attention") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+
+  if (riskLevel === "below_expected_growth") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
+function getAnomalyFlagLabel(flag: GrowthAnomalyFlag): string {
+  if (flag === "low_growth_velocity") return "Low growth velocity";
+  if (flag === "percentile_drop") return "Percentile band drop";
+  return "Possible stunting risk";
 }
 
 type StatCardProps = {
@@ -166,6 +191,7 @@ type ChartTooltipPayload = {
   payload: {
     ageMonths: number;
     childHeight: number | null;
+    predictedHeight: number | null;
     p3: number;
     p15: number;
     p50: number;
@@ -193,6 +219,7 @@ function ChartTooltip({
       </div>
       <div className="space-y-1 text-sm text-slate-600">
         <div>Рост ребёнка: {point.childHeight ?? "—"} см</div>
+        <div>Прогноз роста: {point.predictedHeight ?? "—"} см</div>
         <div>P3: {point.p3} см</div>
         <div>P50: {point.p50} см</div>
         <div>P97: {point.p97} см</div>
@@ -205,8 +232,10 @@ export default function App() {
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [insights, setInsights] = useState<ChildGrowthInsights | null>(null);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [loadingMeasurements, setLoadingMeasurements] = useState(false);
+  const [loadingInsights, setLoadingInsights] = useState(false);
   const [submittingChild, setSubmittingChild] = useState(false);
   const [submittingMeasurement, setSubmittingMeasurement] = useState(false);
   const [deletingMeasurementId, setDeletingMeasurementId] = useState<string | null>(null);
@@ -250,6 +279,19 @@ export default function App() {
     }
   }, []);
 
+  const loadInsights = useCallback(async (childId: string) => {
+    try {
+      setLoadingInsights(true);
+      const data = await getChildInsights(childId);
+      setInsights(data);
+    } catch (error) {
+      console.error("Failed to load child insights:", error);
+      setInsights(null);
+    } finally {
+      setLoadingInsights(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadChildren();
   }, [loadChildren]);
@@ -257,11 +299,13 @@ export default function App() {
   useEffect(() => {
     if (!selectedChildId) {
       setMeasurements([]);
+      setInsights(null);
       return;
     }
 
     void loadMeasurements(selectedChildId);
-  }, [selectedChildId, loadMeasurements]);
+    void loadInsights(selectedChildId);
+  }, [selectedChildId, loadMeasurements, loadInsights]);
 
   async function handleCreateChild(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -345,6 +389,7 @@ export default function App() {
       setMeasurementWeight("");
 
       await loadMeasurements(selectedChildId);
+      await loadInsights(selectedChildId);
     } catch (error) {
       console.error("Failed to create measurement:", error);
     } finally {
@@ -367,6 +412,7 @@ export default function App() {
 
       if (selectedChildId === childId) {
         setMeasurements([]);
+        setInsights(null);
         setSelectedChildId(updatedChildren[0]?.id ?? null);
       }
     } catch (error) {
@@ -382,6 +428,7 @@ export default function App() {
       setDeletingMeasurementId(id);
       await deleteMeasurement(id);
       await loadMeasurements(selectedChildId);
+      await loadInsights(selectedChildId);
     } catch (error) {
       console.error("Failed to delete measurement:", error);
     } finally {
@@ -419,8 +466,14 @@ export default function App() {
   }, [selectedChild]);
 
   const chartData = useMemo(() => {
-    return prepareChartData(whoHeightData, childMeasurements);
-  }, [whoHeightData, childMeasurements]);
+    const predictedPoints =
+      insights?.predictedPoints.map((point) => ({
+        ageMonths: point.ageMonths,
+        predictedHeight: safeNumber(point.predictedHeight),
+      })) ?? [];
+
+    return prepareChartData(whoHeightData, childMeasurements, predictedPoints);
+  }, [whoHeightData, childMeasurements, insights]);
 
   const derived = useMemo(() => {
     if (!selectedChild || measurements.length === 0) return null;
@@ -472,6 +525,8 @@ export default function App() {
       analysis,
     };
   }, [selectedChild, measurements, whoHeightData]);
+
+  const hasInsightWarnings = (insights?.anomalies.length ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -649,10 +704,10 @@ export default function App() {
                     <div className="flex flex-wrap items-center gap-3">
                       <h1 className="text-3xl font-bold text-slate-900">{selectedChild.name}</h1>
 
-                      {derived && derived.analysis.level === "warning" ? (
+                      {hasInsightWarnings ? (
                         <span className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
                           <AlertTriangle size={16} />
-                          Требует внимания
+                          Requires attention
                         </span>
                       ) : null}
                     </div>
@@ -813,13 +868,105 @@ export default function App() {
               ) : null}
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900">Growth AI Insights</div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      Deterministic growth analytics + 6-month height prediction
+                    </div>
+                  </div>
+
+                  {loadingInsights ? (
+                    <Loader2 size={18} className="animate-spin text-slate-400" />
+                  ) : null}
+                </div>
+
+                {loadingInsights ? (
+                  <div className="text-sm text-slate-500">Loading insights...</div>
+                ) : !insights ? (
+                  <div className="text-sm text-slate-500">
+                    Insights are not available yet for this profile.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span
+                        className={`rounded-full border px-3 py-1 text-sm font-semibold ${getInsightRiskBadgeClass(
+                          insights.riskLevel
+                        )}`}
+                      >
+                        {getInsightStatusLabel(insights.status)}
+                      </span>
+
+                      <span className="text-sm text-slate-500">
+                        WHO percentile: {insights.latestPercentileBand} · Z-score:{" "}
+                        {formatZScore(insights.latestZScore)}
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                      {insights.summary}
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Prediction
+                        </div>
+                        <div className="mt-2 text-sm text-slate-700">
+                          {insights.predictionMessage
+                            ? insights.predictionMessage
+                            : `Forecast generated for next 6 months (${insights.predictedPoints.length} points).`}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          WHO Range
+                        </div>
+                        <div className="mt-2 text-sm text-slate-700">
+                          {insights.withinExpectedWhoRange
+                            ? "Current growth is within expected WHO-based range."
+                            : "Current growth is below expected WHO-based range."}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 p-4">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Warning signals
+                      </div>
+                      {insights.anomalies.length === 0 ? (
+                        <div className="mt-2 text-sm text-slate-700">
+                          No anomaly flags detected in recent growth records.
+                        </div>
+                      ) : (
+                        <ul className="mt-3 space-y-3">
+                          {insights.anomalies.map((anomaly) => (
+                            <li key={`${anomaly.flag}-${anomaly.explanation}`} className="text-sm">
+                              <div className="font-semibold text-slate-800">
+                                {getAnomalyFlagLabel(anomaly.flag)}
+                              </div>
+                              <div className="text-slate-600">{anomaly.explanation}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="text-xs leading-5 text-slate-500">{insights.disclaimer}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
                   <div>
                     <div className="text-2xl font-bold text-slate-900">
                       WHO Height-for-age Chart
                     </div>
                     <div className="mt-1 text-lg text-slate-500">
-                      WHO reference percentiles + рост ребёнка
+                      WHO reference percentiles + observed and predicted height
                     </div>
                   </div>
                 </div>
@@ -848,8 +995,18 @@ export default function App() {
                       <Line
                         type="monotone"
                         dataKey="childHeight"
+                        stroke="#0f766e"
                         strokeWidth={3}
                         dot={{ r: 4 }}
+                        connectNulls={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="predictedHeight"
+                        stroke="#0284c7"
+                        strokeWidth={3}
+                        strokeDasharray="5 5"
+                        dot={{ r: 3 }}
                         connectNulls={false}
                       />
                     </LineChart>
@@ -869,9 +1026,9 @@ export default function App() {
                       </div>
                     </div>
 
-                    {derived?.analysis.level === "warning" ? (
+                    {hasInsightWarnings ? (
                       <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
-                        Требует внимания
+                        Warning signs
                       </span>
                     ) : null}
                   </div>

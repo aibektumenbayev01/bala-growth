@@ -1,10 +1,24 @@
-import type { Child, Measurement } from "@bala/shared";
+import type {
+  Child,
+  ChildGrowthInsights,
+  GrowthPredictionPoint,
+  Measurement,
+} from "@bala/shared";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
 // даты в JSON приходят строками
 type ChildDTO = Omit<Child, "birthDate"> & { birthDate: string };
 type MeasurementDTO = Omit<Measurement, "date"> & { date: string };
+type GrowthPredictionPointDTO = Omit<GrowthPredictionPoint, "date"> & { date: string };
+type ChildGrowthInsightsDTO = Omit<
+  ChildGrowthInsights,
+  "generatedAt" | "historicalMeasurements" | "predictedPoints"
+> & {
+  generatedAt: string;
+  historicalMeasurements: MeasurementDTO[];
+  predictedPoints: GrowthPredictionPointDTO[];
+};
 
 function parseApiDate(value: string): Date {
   const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -22,6 +36,19 @@ function toChild(dto: ChildDTO): Child {
 
 function toMeasurement(dto: MeasurementDTO): Measurement {
   return { ...dto, date: parseApiDate(dto.date) };
+}
+
+function toGrowthPredictionPoint(dto: GrowthPredictionPointDTO): GrowthPredictionPoint {
+  return { ...dto, date: parseApiDate(dto.date) };
+}
+
+function toChildGrowthInsights(dto: ChildGrowthInsightsDTO): ChildGrowthInsights {
+  return {
+    ...dto,
+    generatedAt: parseApiDate(dto.generatedAt),
+    historicalMeasurements: dto.historicalMeasurements.map(toMeasurement),
+    predictedPoints: dto.predictedPoints.map(toGrowthPredictionPoint),
+  };
 }
 
 export async function getChildren(): Promise<Child[]> {
@@ -91,4 +118,12 @@ export async function deleteChild(id: string): Promise<void> {
   });
 
   if (!res.ok) throw new Error("Failed to delete child");
+}
+
+export async function getChildInsights(childId: string): Promise<ChildGrowthInsights> {
+  const res = await fetch(`${API_BASE}/children/${childId}/insights`);
+  if (!res.ok) throw new Error("Failed to load child insights");
+
+  const dto: ChildGrowthInsightsDTO = await res.json();
+  return toChildGrowthInsights(dto);
 }

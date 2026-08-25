@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { PrismaClient } = require("@prisma/client");
+const { buildChildGrowthInsights } = require("./services/growthAnalytics");
 
 const prisma = new PrismaClient();
 const app = express();
@@ -89,6 +90,27 @@ app.post("/children/:id/measurements", async (req, res) => {
     res.status(201).json(m);
   } catch (e) {
     res.status(400).json({ error: e.message });
+  }
+});
+
+app.get("/children/:id/insights", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const child = await prisma.child.findUnique({ where: { id } });
+    if (!child) {
+      return res.status(404).json({ error: "Child not found" });
+    }
+
+    const measurements = await prisma.measurement.findMany({
+      where: { childId: id },
+      orderBy: { date: "asc" },
+    });
+
+    const insights = buildChildGrowthInsights(child, measurements);
+    return res.json(insights);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 });
 

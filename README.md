@@ -12,15 +12,10 @@ This project was built as a portfolio pet-project to demonstrate full-stack deve
 
 ### Application Interface
 
-![Dashboard](docs:dashboard.png)
-![Profile1](docs:profile1.png)
-![chart1](docs:chart1.png)
-![Profile2](docs:profile2.png)
-![chart2](docs:chart2.png)
-
-![Child Profile](docs/profile.png)
-
-![Growth Chart](docs/chart.png)
+![Dashboard](docs/dashboard.png)
+![Profile1](docs/profile1.png)
+![Profile2](docs/profile2.png)
+![chart2](docs/chart2.png)
 
 ## About This Project
 
