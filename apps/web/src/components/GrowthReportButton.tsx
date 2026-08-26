@@ -1,4 +1,6 @@
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
 import type {
   Child,
   ChildGrowthInsights,
@@ -20,7 +22,7 @@ export default function GrowthReportButton({
   measurements,
   insights,
 }: GrowthReportButtonProps) {
-function generatePdf() {
+async function generatePdf() {
   const pdf = new jsPDF();
 
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -201,6 +203,44 @@ function generatePdf() {
   });
 
   y += 10;
+
+  // WHO Growth Chart
+const chartElement = document.getElementById("who-growth-chart");
+
+if (chartElement) {
+  if (y > 170) {
+    pdf.addPage();
+    y = 20;
+  }
+
+  pdf.setTextColor(15, 23, 42);
+  pdf.setFontSize(14);
+  pdf.text("WHO Height-for-age Chart", 20, y);
+
+  y += 8;
+
+  const canvas = await html2canvas(chartElement, {
+    scale: 2,
+    backgroundColor: "#f8fafc",
+  });
+
+  const chartImage = canvas.toDataURL("image/png");
+
+  const imageWidth = pageWidth - 40;
+  const imageHeight =
+    (canvas.height * imageWidth) / canvas.width;
+
+  pdf.addImage(
+    chartImage,
+    "PNG",
+    20,
+    y,
+    imageWidth,
+    imageHeight
+  );
+
+  y += imageHeight + 12;
+}
 
   // Prediction
   if (insights?.predictionMessage) {

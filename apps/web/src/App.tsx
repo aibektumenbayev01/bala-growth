@@ -1231,8 +1231,11 @@ const chartDataWithSimulation = useMemo(() => {
                   </div>
                 </div>
 
-                <div className="mt-4 h-[300px] w-full rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                  <ResponsiveContainer width="100%" height="100%">
+                    <div
+                      id="who-growth-chart"
+                      className="mt-4 h-[300px] w-full rounded-2xl border border-slate-100 bg-slate-50 p-3"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartDataWithSimulation}>
                       <CartesianGrid strokeDasharray="3 3" vertical={true} />
                       <XAxis
