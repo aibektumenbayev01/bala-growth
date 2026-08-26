@@ -51,6 +51,7 @@ import {
 
 import { hfaBoys5to19 } from "./who/hfa-boys-5-19";
 import { hfaGirls5to19 } from "./who/hfa-girls-5-19";
+import GrowthStory from "./components/GrowthStory";
 
 type Gender = "male" | "female";
 
@@ -1111,6 +1112,9 @@ useEffect(() => {
                   </div>
                 )}
               </div>
+
+              <GrowthStory measurements={measurements} />
+              
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
