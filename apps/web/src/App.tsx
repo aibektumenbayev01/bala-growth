@@ -52,6 +52,7 @@ import {
 import { hfaBoys5to19 } from "./who/hfa-boys-5-19";
 import { hfaGirls5to19 } from "./who/hfa-girls-5-19";
 import GrowthStory from "./components/GrowthStory";
+import GrowthSimulator from "./components/GrowthSimulator";
 
 type Gender = "male" | "female";
 
@@ -265,6 +266,9 @@ export default function App() {
   const [measurementDate, setMeasurementDate] = useState(getTodayIsoDate());
   const [measurementHeight, setMeasurementHeight] = useState("");
   const [measurementWeight, setMeasurementWeight] = useState("");
+
+  const [simulationGrowthRate, setSimulationGrowthRate] = useState(5);
+  const [simulationMonthsAhead, setSimulationMonthsAhead] = useState(12);
 
   const loadChildren = useCallback(async () => {
     try {
@@ -536,56 +540,134 @@ useEffect(() => {
     return prepareChartData(whoHeightData, childMeasurements, predictedPoints);
   }, [whoHeightData, childMeasurements, insights]);
 
-  const derived = useMemo(() => {
-    if (!selectedChild || measurements.length === 0) return null;
+ const derived = useMemo(() => {
+  if (!selectedChild || measurements.length === 0) return null;
 
-    const sorted = [...measurements].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  const sorted = [...measurements].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const last = sorted.at(-1);
+  const prev = sorted.length >= 2 ? sorted.at(-2) : null;
+
+  if (!last) return null;
+
+  const ageMonths = getAgeInMonths(
+    selectedChild.birthDate,
+    last.date
+  );
+
+  const whoRow = getNearestWhoRow(
+    whoHeightData,
+    ageMonths
+  );
+
+  const currentHeight = safeNumber(last.height);
+  const currentWeight = safeNumber(last.weight);
+
+  const percentile = getHeightPercentileBand(
+    currentHeight,
+    whoRow
+  );
+
+  const zScore = getHeightZScore(
+    currentHeight,
+    whoRow
+  );
+
+  const zScoreStatus = getHeightZScoreStatus(zScore);
+
+  let annualGrowth: number | null = null;
+
+  if (prev) {
+    const monthsDiff = getAgeInMonths(
+      prev.date,
+      last.date
     );
 
-    const last = sorted.at(-1);
-    const prev = sorted.length >= 2 ? sorted.at(-2) : null;
+    const heightDiff =
+      currentHeight - safeNumber(prev.height);
 
-    if (!last) return null;
+    if (monthsDiff > 0) {
+      annualGrowth = Number(
+        ((heightDiff / monthsDiff) * 12).toFixed(1)
+      );
+    }
+  }
 
-    const ageMonths = getAgeInMonths(selectedChild.birthDate, last.date);
-    const whoRow = getNearestWhoRow(whoHeightData, ageMonths);
+  const annualGrowthStatus =
+    getGrowthVelocityStatus(annualGrowth);
 
-    const currentHeight = safeNumber(last.height);
-    const currentWeight = safeNumber(last.weight);
+  const analysis = getAnalysisText(
+    percentile,
+    zScore,
+    annualGrowth
+  );
 
-    const percentile = getHeightPercentileBand(currentHeight, whoRow);
-    const zScore = getHeightZScore(currentHeight, whoRow);
-    const zScoreStatus = getHeightZScoreStatus(zScore);
+  return {
+    ageMonths,
+    whoRow,
+    currentHeight,
+    currentWeight,
+    percentile,
+    zScore,
+    zScoreStatus,
+    annualGrowth,
+    annualGrowthStatus,
+    last,
+    prev,
+    analysis,
+  };
+}, [
+  selectedChild,
+  measurements,
+  whoHeightData,
+]);
 
-    let annualGrowth: number | null = null;
-    if (prev) {
-      const monthsDiff = getAgeInMonths(prev.date, last.date);
-      const heightDiff = currentHeight - safeNumber(prev.height);
+const chartDataWithSimulation = useMemo(() => {
+  if (!derived) {
+    return chartData;
+  }
 
-      if (monthsDiff > 0) {
-        annualGrowth = Number(((heightDiff / monthsDiff) * 12).toFixed(1));
-      }
+  const currentAgeMonths = derived.ageMonths;
+  const currentHeight = derived.currentHeight;
+
+  const futureAgeMonths =
+    currentAgeMonths + simulationMonthsAhead;
+
+  const futureHeight =
+    currentHeight +
+    simulationGrowthRate *
+      (simulationMonthsAhead / 12);
+
+  return chartData.map((point) => {
+    if (point.ageMonths === currentAgeMonths) {
+      return {
+        ...point,
+        simulatedHeight: currentHeight,
+      };
     }
 
-    const annualGrowthStatus = getGrowthVelocityStatus(annualGrowth);
-    const analysis = getAnalysisText(percentile, zScore, annualGrowth);
+    if (point.ageMonths === futureAgeMonths) {
+      return {
+        ...point,
+        simulatedHeight: Number(
+          futureHeight.toFixed(1)
+        ),
+      };
+    }
 
     return {
-      ageMonths,
-      whoRow,
-      currentHeight,
-      currentWeight,
-      percentile,
-      zScore,
-      zScoreStatus,
-      annualGrowth,
-      annualGrowthStatus,
-      last,
-      prev,
-      analysis,
+      ...point,
+      simulatedHeight: null,
     };
-  }, [selectedChild, measurements, whoHeightData]);
+  });
+}, [
+  chartData,
+  derived,
+  simulationGrowthRate,
+  simulationMonthsAhead,
+]);
 
   const hasInsightWarnings = (insights?.anomalies.length ?? 0) > 0;
 
@@ -1117,7 +1199,16 @@ useEffect(() => {
                 measurements={measurements}
                 insights={insights}
               />
-              
+
+              <GrowthSimulator
+                measurements={measurements}
+                birthDate={selectedChild.birthDate}
+                gender={selectedChild.gender as Gender}
+                growthRate={simulationGrowthRate}
+                monthsAhead={simulationMonthsAhead}
+                onGrowthRateChange={setSimulationGrowthRate}
+                onMonthsAheadChange={setSimulationMonthsAhead}
+              />
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
@@ -1133,7 +1224,7 @@ useEffect(() => {
 
                 <div className="mt-4 h-[300px] w-full rounded-2xl border border-slate-100 bg-slate-50 p-3">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
+                    <LineChart data={chartDataWithSimulation}>
                       <CartesianGrid strokeDasharray="3 3" vertical={true} />
                       <XAxis
                         dataKey="ageMonths"
@@ -1151,6 +1242,16 @@ useEffect(() => {
                       <Line type="monotone" dataKey="p50" strokeWidth={3} dot={false} />
                       <Line type="monotone" dataKey="p85" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="p97" strokeWidth={2} dot={false} />
+
+                      <Line
+                        type="monotone"
+                        dataKey="simulatedHeight"
+                        stroke="#7c3aed"
+                        strokeWidth={4}
+                        strokeDasharray="8 6"
+                        dot={{ r: 5 }}
+                        connectNulls={true}
+                      />
 
                       <Line
                         type="monotone"
