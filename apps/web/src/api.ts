@@ -7,6 +7,29 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
+const TOKEN_KEY = "bala_token";
+
+export function saveToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function authHeaders(extra: Record<string, string> = {}) {
+  const token = getToken();
+
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // даты в JSON приходят строками
 type ChildDTO = Omit<Child, "birthDate"> & { birthDate: string };
 type MeasurementDTO = Omit<Measurement, "date"> & { date: string };
@@ -51,44 +74,125 @@ function toChildGrowthInsights(dto: ChildGrowthInsightsDTO): ChildGrowthInsights
   };
 }
 
+export async function register(email: string, password: string) {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error ?? "Failed to register");
+  }
+
+  saveToken(data.token);
+
+  return data.user;
+}
+
+export async function login(email: string, password: string) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error ?? "Failed to login");
+  }
+
+  saveToken(data.token);
+
+  return data.user;
+}
+
+export function logout() {
+  clearToken();
+}
+
 export async function getChildren(): Promise<Child[]> {
-  const res = await fetch(`${API_BASE}/children`);
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/children`, {
+      headers: authHeaders(),
+    })
+  );
+
   if (!res.ok) throw new Error("Failed to load children");
+
   const data: ChildDTO[] = await res.json();
   return data.map(toChild);
 }
+
+async function handleResponse(res: Response) {
+  if (res.status === 401) {
+    clearToken();
+    window.location.reload();
+    throw new Error("Session expired");
+  }
+
+  return res;
+}
+
 
 export async function createChild(input: {
   name: string;
   gender: "male" | "female";
   birthDate: Date;
 }): Promise<Child> {
-  const res = await fetch(`${API_BASE}/children`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: input.name,
-      gender: input.gender,
-      birthDate: input.birthDate.toISOString(),
-    }),
-  });
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/children`, {
+      method: "POST",
+      headers: authHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        name: input.name,
+        gender: input.gender,
+        birthDate: input.birthDate.toISOString(),
+      }),
+    })
+  );
 
   if (!res.ok) throw new Error("Failed to create child");
+
   const dto: ChildDTO = await res.json();
   return toChild(dto);
 }
 
 export async function getMeasurements(childId: string): Promise<Measurement[]> {
-  const res = await fetch(`${API_BASE}/children/${childId}/measurements`);
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/children/${childId}/measurements`, {
+      headers: authHeaders(),
+    })
+  );
+
   if (!res.ok) throw new Error("Failed to load measurements");
+
   const data: MeasurementDTO[] = await res.json();
   return data.map(toMeasurement);
 }
 
 export async function deleteMeasurement(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/measurements/${id}`, {
-    method: "DELETE",
-  });
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/measurements/${id}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    })
+  );
 
   if (!res.ok) throw new Error("Failed to delete measurement");
 }
@@ -97,31 +201,46 @@ export async function createMeasurement(
   childId: string,
   input: { date: Date; height: number; weight: number }
 ): Promise<Measurement> {
-  const res = await fetch(`${API_BASE}/children/${childId}/measurements`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      date: input.date.toISOString(),
-      height: input.height,
-      weight: input.weight,
-    }),
-  });
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/children/${childId}/measurements`, {
+      method: "POST",
+      headers: authHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        date: input.date.toISOString(),
+        height: input.height,
+        weight: input.weight,
+      }),
+    })
+  );
 
   if (!res.ok) throw new Error("Failed to create measurement");
+
   const dto: MeasurementDTO = await res.json();
   return toMeasurement(dto);
 }
 
 export async function deleteChild(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/children/${id}`, {
-    method: "DELETE",
-  });
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/children/${id}`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    })
+  );
 
   if (!res.ok) throw new Error("Failed to delete child");
 }
 
-export async function getChildInsights(childId: string): Promise<ChildGrowthInsights> {
-  const res = await fetch(`${API_BASE}/children/${childId}/insights`);
+export async function getChildInsights(
+  childId: string
+): Promise<ChildGrowthInsights> {
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/children/${childId}/insights`, {
+      headers: authHeaders(),
+    })
+  );
+
   if (!res.ok) throw new Error("Failed to load child insights");
 
   const dto: ChildGrowthInsightsDTO = await res.json();

@@ -33,6 +33,10 @@ import {
   createMeasurement,
   deleteMeasurement,
   deleteChild,
+  login,
+  register,
+  logout,
+  getToken,
 } from "./api";
 
 import {
@@ -229,6 +233,16 @@ function ChartTooltip({
 }
 
 export default function App() {
+    const [isAuthenticated, setIsAuthenticated] = useState(
+    () => Boolean(getToken())
+  );
+
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -292,9 +306,13 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
+  if (isAuthenticated) {
     void loadChildren();
-  }, [loadChildren]);
+  } else {
+    setLoadingChildren(false);
+  }
+}, [isAuthenticated, loadChildren]);
 
   useEffect(() => {
     if (!selectedChildId) {
@@ -306,6 +324,48 @@ export default function App() {
     void loadMeasurements(selectedChildId);
     void loadInsights(selectedChildId);
   }, [selectedChildId, loadMeasurements, loadInsights]);
+
+  function handleLogout() {
+  logout();
+
+  setIsAuthenticated(false);
+  setChildren([]);
+  setSelectedChildId(null);
+  setMeasurements([]);
+  setInsights(null);
+}
+
+  async function handleAuth(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  if (!email || !password) {
+    setAuthError("Введите email и пароль.");
+    return;
+  }
+
+  try {
+    setAuthLoading(true);
+    setAuthError(null);
+
+    if (authMode === "login") {
+      await login(email, password);
+    } else {
+      await register(email, password);
+    }
+
+    setIsAuthenticated(true);
+    setEmail("");
+    setPassword("");
+  } catch (error) {
+    if (error instanceof Error) {
+      setAuthError(error.message);
+    } else {
+      setAuthError("Произошла ошибка.");
+    }
+  } finally {
+    setAuthLoading(false);
+  }
+}
 
   async function handleCreateChild(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -528,6 +588,89 @@ export default function App() {
 
   const hasInsightWarnings = (insights?.anomalies.length ?? 0) > 0;
 
+  if (!isAuthenticated) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-500 text-white">
+            <Activity size={26} />
+          </div>
+
+          <h1 className="text-3xl font-bold text-slate-900">
+            GrowthTrack KZ
+          </h1>
+
+          <p className="mt-2 text-slate-500">
+            Pediatric Health Platform
+          </p>
+        </div>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">
+              Email
+            </label>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-600">
+              Пароль
+            </label>
+
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+            />
+          </div>
+
+          {authError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {authError}
+            </div>
+          ) : null}
+
+          <button
+            type="submit"
+            disabled={authLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
+          >
+            {authLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : null}
+
+            {authMode === "login" ? "Войти" : "Создать аккаунт"}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAuthMode(authMode === "login" ? "register" : "login");
+            setAuthError(null);
+          }}
+          className="mt-5 w-full text-sm font-semibold text-cyan-600"
+        >
+          {authMode === "login"
+            ? "Нет аккаунта? Зарегистрироваться"
+            : "Уже есть аккаунт? Войти"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -544,17 +687,27 @@ export default function App() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setChildFormError(null);
-              setIsCreateChildOpen(true);
-            }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-600"
-          >
-            <PlusCircle size={18} />
-            Добавить ребёнка
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            >
+              Выйти
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setChildFormError(null);
+                setIsCreateChildOpen(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-600"
+            >
+              <PlusCircle size={18} />
+              Добавить ребёнка
+            </button>
+          </div>
         </div>
       </header>
 
