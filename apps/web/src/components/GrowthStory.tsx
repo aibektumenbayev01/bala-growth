@@ -62,11 +62,24 @@ export default function GrowthStory({ measurements }: GrowthStoryProps) {
                     {Number(measurement.weight)} кг
                   </div>
 
-                  {heightChange !== null && (
-                    <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-600">
-                      +{heightChange.toFixed(1)} см
+                 {heightChange !== null && (
+                    <div
+                        className={`mt-2 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                        heightChange < 0
+                            ? "bg-red-50 text-red-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        }`}
+                    >
+                        {heightChange > 0 ? "+" : ""}
+                        {heightChange.toFixed(1)} см
                     </div>
-                  )}
+                    )}
+
+                    {heightChange !== null && heightChange < 0 && (
+                    <div className="mt-2 text-sm font-semibold text-red-600">
+                        ⚠ Height decreased — check measurement
+                    </div>
+                    )}
                 </div>
               </div>
             );
