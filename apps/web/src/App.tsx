@@ -53,6 +53,7 @@ import { hfaBoys5to19 } from "./who/hfa-boys-5-19";
 import { hfaGirls5to19 } from "./who/hfa-girls-5-19";
 import GrowthStory from "./components/GrowthStory";
 import GrowthSimulator from "./components/GrowthSimulator";
+import GrowthReportButton from "./components/GrowthReportButton";
 
 type Gender = "male" | "female";
 
@@ -959,15 +960,23 @@ const chartDataWithSimulation = useMemo(() => {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSelectedChildId(null)}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  <ArrowLeft size={18} />
-                  К списку
-                </button>
-              </div>
+            <div className="flex items-center gap-3">
+          <GrowthReportButton
+            child={selectedChild}
+            measurements={measurements}
+            insights={insights}
+          />
+
+          <button
+            type="button"
+            onClick={() => setSelectedChildId(null)}
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={18} />
+            К списку
+          </button>
+          </div>
+        </div>
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <StatCard
