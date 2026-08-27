@@ -1,5 +1,4 @@
 import jsPDF from "jspdf";
-
 import type {
   Child,
   ChildGrowthInsights,
