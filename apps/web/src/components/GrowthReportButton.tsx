@@ -23,8 +23,9 @@ export default function GrowthReportButton({
   insights,
 }: GrowthReportButtonProps) {
 async function generatePdf() {
-  const pdf = new jsPDF();
-
+    try {
+      const pdf = new jsPDF();
+    
   const pageWidth = pdf.internal.pageSize.getWidth();
 
   let y = 20;
@@ -331,12 +332,21 @@ if (chartElement) {
     pdf.text(disclaimerLines, 20, y);
   }
 
-  pdf.save(
-    `${child.name
-      .trim()
-      .replace(/\s+/g, "-")
-      .toLowerCase()}-growth-report.pdf`
-  );
+    pdf.save(
+      `${child.name
+        .trim()
+        .replace(/\s+/g, "-")
+        .toLowerCase()}-growth-report.pdf`
+    );
+  } catch (error) {
+    console.error("PDF generation failed:", error);
+
+    alert(
+      error instanceof Error
+        ? `PDF generation failed: ${error.message}`
+        : "PDF generation failed"
+    );
+  }
 }
 
   return (
