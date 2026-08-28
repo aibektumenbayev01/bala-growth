@@ -241,6 +241,18 @@ export default function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(
     () => Boolean(getToken())
   );
+type CurrentUser = {
+  id: string;
+  email: string;
+  createdAt?: string | Date;
+};
+
+const [currentUser, setCurrentUser] =
+  useState<CurrentUser | null>(null);
+
+const [isAccountOpen, setIsAccountOpen] =
+  useState(false);
+
 
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -405,13 +417,17 @@ useEffect(() => {
     setAuthLoading(true);
     setAuthError(null);
 
-    if (authMode === "login") {
-      await login(email, password);
-    } else {
-      await register(email, password);
-    }
+let user;
 
-    setIsAuthenticated(true);
+if (authMode === "login") {
+  user = await login(email, password);
+} else {
+  user = await register(email, password);
+}
+
+setCurrentUser(user);
+setIsAuthenticated(true);
+
     setEmail("");
     setPassword("");
   } catch (error) {
@@ -861,13 +877,14 @@ const chartDataWithSimulation = useMemo(() => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-            >
-              Выйти
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsAccountOpen(true)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50"
+              >
+                <User size={18} />
+                Account
+              </button>
 
             <button
               type="button"
@@ -1736,6 +1753,98 @@ const chartDataWithSimulation = useMemo(() => {
                   )}
                   Сохранить профиль
                 </button>
+
+                {isAccountOpen ? (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+                    onClick={() => setIsAccountOpen(false)}
+                  >
+                    <div
+                      className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-600">
+                            <User size={26} />
+                          </div>
+
+                          <div>
+                            <h2 className="text-2xl font-bold text-slate-900">
+                              My Account
+                            </h2>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                              Account and profile settings
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="mt-6 space-y-3">
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                            Email
+                          </div>
+
+                          <div className="mt-2 font-semibold text-slate-900">
+                            {currentUser?.email ?? "—"}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                              Children
+                            </div>
+
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
+                              {children.length}
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                              Measurements
+                            </div>
+
+                            <div className="mt-2 text-2xl font-bold text-slate-900">
+                              {dashboardStats.totalMeasurements}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 space-y-3">
+                        <button
+                          type="button"
+                          className="w-full rounded-2xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-700"
+                        >
+                          Change password
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAccountOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full rounded-2xl border border-red-200 px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <button
                   type="button"
