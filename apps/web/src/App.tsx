@@ -37,6 +37,7 @@ import {
   register,
   logout,
   getToken,
+  changePassword,
 } from "./api";
 
 import {
@@ -251,6 +252,22 @@ const [currentUser, setCurrentUser] =
   useState<CurrentUser | null>(null);
 
 const [isAccountOpen, setIsAccountOpen] =
+  useState(false);
+
+  const [isChangePasswordOpen, setIsChangePasswordOpen] =
+  useState(false);
+
+const [currentPassword, setCurrentPassword] = useState("");
+const [newPassword, setNewPassword] = useState("");
+const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
+const [passwordError, setPasswordError] =
+  useState<string | null>(null);
+
+const [passwordSuccess, setPasswordSuccess] =
+  useState<string | null>(null);
+
+const [changingPassword, setChangingPassword] =
   useState(false);
 
 
@@ -554,6 +571,55 @@ setIsAuthenticated(true);
       alert("Не удалось удалить профиль ребёнка");
     }
   }
+
+  async function handleChangePassword(
+  event: FormEvent<HTMLFormElement>
+) {
+  event.preventDefault();
+
+  setPasswordError(null);
+  setPasswordSuccess(null);
+
+  if (!currentPassword || !newPassword || !confirmNewPassword) {
+    setPasswordError("Заполни все поля.");
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    setPasswordError(
+      "Новый пароль должен содержать минимум 8 символов."
+    );
+    return;
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    setPasswordError("Новые пароли не совпадают.");
+    return;
+  }
+
+  try {
+    setChangingPassword(true);
+
+    await changePassword(
+      currentPassword,
+      newPassword
+    );
+
+    setPasswordSuccess("Password changed successfully.");
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmNewPassword("");
+  } catch (error) {
+    if (error instanceof Error) {
+      setPasswordError(error.message);
+    } else {
+      setPasswordError("Failed to change password.");
+    }
+  } finally {
+    setChangingPassword(false);
+  }
+}
 
   async function handleDeleteMeasurement(id: string) {
     if (!selectedChildId) return;
@@ -1844,6 +1910,11 @@ const chartDataWithSimulation = useMemo(() => {
                       <div className="mt-6 space-y-3">
                         <button
                           type="button"
+                          onClick={() => {
+                            setPasswordError(null);
+                            setPasswordSuccess(null);
+                            setIsChangePasswordOpen(true);
+                          }}
                           className="w-full rounded-2xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-700"
                         >
                           Change password
@@ -1863,6 +1934,118 @@ const chartDataWithSimulation = useMemo(() => {
                     </div>
                   </div>
                 ) : null}
+                {isChangePasswordOpen ? (
+                <div
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4"
+                  onClick={() => setIsChangePasswordOpen(false)}
+                >
+                  <div
+                    className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-2xl font-bold text-slate-900">
+                          Change password
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Enter your current password and choose a new one.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsChangePasswordOpen(false);
+                          setPasswordError(null);
+                          setPasswordSuccess(null);
+                        }}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <form
+                      onSubmit={handleChangePassword}
+                      className="mt-6 space-y-4"
+                    >
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-600">
+                          Current password
+                        </label>
+
+                        <input
+                          type="password"
+                          value={currentPassword}
+                          onChange={(event) =>
+                            setCurrentPassword(event.target.value)
+                          }
+                          placeholder="Current password"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-600">
+                          New password
+                        </label>
+
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(event) =>
+                            setNewPassword(event.target.value)
+                          }
+                          placeholder="Minimum 8 characters"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-600">
+                          Confirm new password
+                        </label>
+
+                        <input
+                          type="password"
+                          value={confirmNewPassword}
+                          onChange={(event) =>
+                            setConfirmNewPassword(event.target.value)
+                          }
+                          placeholder="Repeat new password"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                        />
+                      </div>
+
+                      {passwordError ? (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                          {passwordError}
+                        </div>
+                      ) : null}
+
+                      {passwordSuccess ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                          {passwordSuccess}
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="submit"
+                        disabled={changingPassword}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
+                      >
+                        {changingPassword ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : null}
+
+                        Update password
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ) : null}
                 
     </div>
   );

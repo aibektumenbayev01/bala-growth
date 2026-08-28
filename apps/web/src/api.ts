@@ -246,3 +246,27 @@ export async function getChildInsights(
   const dto: ChildGrowthInsightsDTO = await res.json();
   return toChildGrowthInsights(dto);
 }
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const res = await handleResponse(
+    await fetch(`${API_BASE}/auth/password`, {
+      method: "PATCH",
+      headers: authHeaders({
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
+    })
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error ?? "Failed to change password");
+  }
+}
