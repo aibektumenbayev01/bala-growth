@@ -14,6 +14,8 @@ import {
   User,
   Activity,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -310,6 +312,9 @@ const [changingPassword, setChangingPassword] =
 
   const [simulationGrowthRate, setSimulationGrowthRate] = useState(5);
   const [simulationMonthsAhead, setSimulationMonthsAhead] = useState(12);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
 
 const loadDashboardData = useCallback(
@@ -1971,53 +1976,101 @@ const chartDataWithSimulation = useMemo(() => {
                       onSubmit={handleChangePassword}
                       className="mt-6 space-y-4"
                     >
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-600">
-                          Current password
-                        </label>
+                            <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-600">
+                      Current password
+                    </label>
 
-                        <input
-                          type="password"
-                          value={currentPassword}
-                          onChange={(event) =>
-                            setCurrentPassword(event.target.value)
-                          }
-                          placeholder="Current password"
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
-                        />
-                      </div>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPassword ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(event) =>
+                          setCurrentPassword(event.target.value)
+                        }
+                        placeholder="Current password"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 outline-none transition focus:border-cyan-400"
+                      />
 
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-600">
-                          New password
-                        </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowCurrentPassword((prev) => !prev)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      >
+                        {showCurrentPassword ? (
+                          <EyeOff size={19} />
+                        ) : (
+                          <Eye size={19} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
 
-                        <input
-                          type="password"
-                          value={newPassword}
-                          onChange={(event) =>
-                            setNewPassword(event.target.value)
-                          }
-                          placeholder="Minimum 8 characters"
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
-                        />
-                      </div>
+                   <div>
+  <label className="mb-2 block text-sm font-semibold text-slate-600">
+    New password
+  </label>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-600">
-                          Confirm new password
-                        </label>
+  <div className="relative">
+    <input
+      type={showNewPassword ? "text" : "password"}
+      value={newPassword}
+      onChange={(event) =>
+        setNewPassword(event.target.value)
+      }
+      placeholder="Minimum 8 characters"
+      className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 outline-none transition focus:border-cyan-400"
+    />
 
-                        <input
-                          type="password"
-                          value={confirmNewPassword}
-                          onChange={(event) =>
-                            setConfirmNewPassword(event.target.value)
-                          }
-                          placeholder="Repeat new password"
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
-                        />
-                      </div>
+    <button
+      type="button"
+      onClick={() =>
+        setShowNewPassword((prev) => !prev)
+      }
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+    >
+      {showNewPassword ? (
+        <EyeOff size={19} />
+      ) : (
+        <Eye size={19} />
+      )}
+    </button>
+  </div>
+</div>
+
+                    <div>
+  <label className="mb-2 block text-sm font-semibold text-slate-600">
+    Confirm new password
+  </label>
+
+  <div className="relative">
+    <input
+      type={showConfirmPassword ? "text" : "password"}
+      value={confirmNewPassword}
+      onChange={(event) =>
+        setConfirmNewPassword(event.target.value)
+      }
+      placeholder="Repeat new password"
+      className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 outline-none transition focus:border-cyan-400"
+    />
+
+    <button
+      type="button"
+      onClick={() =>
+        setShowConfirmPassword((prev) => !prev)
+      }
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+    >
+      {showConfirmPassword ? (
+        <EyeOff size={19} />
+      ) : (
+        <Eye size={19} />
+      )}
+    </button>
+  </div>
+</div>
 
                       {passwordError ? (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
