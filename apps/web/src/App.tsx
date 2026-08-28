@@ -207,6 +207,8 @@ type ChartTooltipPayload = {
   };
 };
 
+
+
 function ChartTooltip({
   active,
   payload,
@@ -250,6 +252,15 @@ export default function App() {
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [insights, setInsights] = useState<ChildGrowthInsights | null>(null);
+  type DashboardChildData = {
+  measurements: Measurement[];
+  insights: ChildGrowthInsights | null;
+};
+
+  const [dashboardData, setDashboardData] = useState<
+    Record<string, DashboardChildData>
+  >({});
+
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [loadingMeasurements, setLoadingMeasurements] = useState(false);
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -271,46 +282,87 @@ export default function App() {
   const [simulationGrowthRate, setSimulationGrowthRate] = useState(5);
   const [simulationMonthsAhead, setSimulationMonthsAhead] = useState(12);
 
-  const loadChildren = useCallback(async () => {
-    try {
-      setLoadingChildren(true);
-      const data = await getChildren();
-      setChildren(data);
-      setSelectedChildId((prev) => prev ?? data[0]?.id ?? null);
-    } catch (error) {
-      console.error("Failed to load children:", error);
-    } finally {
-      setLoadingChildren(false);
-    }
-  }, []);
 
-  const loadMeasurements = useCallback(async (childId: string) => {
+const loadDashboardData = useCallback(
+  async (childrenList: Child[]) => {
     try {
-      setLoadingMeasurements(true);
-      const data = await getMeasurements(childId);
-      const sorted = [...data].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      const entries = await Promise.all(
+        childrenList.map(async (child) => {
+          const [childMeasurements, childInsights] = await Promise.all([
+            getMeasurements(child.id),
+            getChildInsights(child.id),
+          ]);
+
+          return [
+            child.id,
+            {
+              measurements: childMeasurements,
+              insights: childInsights,
+            },
+          ] as const;
+        })
       );
-      setMeasurements(sorted);
-    } catch (error) {
-      console.error("Failed to load measurements:", error);
-    } finally {
-      setLoadingMeasurements(false);
-    }
-  }, []);
 
-  const loadInsights = useCallback(async (childId: string) => {
-    try {
-      setLoadingInsights(true);
-      const data = await getChildInsights(childId);
-      setInsights(data);
+      setDashboardData(Object.fromEntries(entries));
     } catch (error) {
-      console.error("Failed to load child insights:", error);
-      setInsights(null);
-    } finally {
-      setLoadingInsights(false);
+      console.error("Failed to load dashboard data:", error);
     }
-  }, []);
+  },
+  []
+);
+
+const loadChildren = useCallback(async () => {
+  try {
+    setLoadingChildren(true);
+
+    const data = await getChildren();
+
+    setChildren(data);
+
+    await loadDashboardData(data);
+
+    setSelectedChildId(null);
+  } catch (error) {
+    console.error("Failed to load children:", error);
+  } finally {
+    setLoadingChildren(false);
+  }
+}, [loadDashboardData]);
+
+const loadMeasurements = useCallback(async (childId: string) => {
+  try {
+    setLoadingMeasurements(true);
+
+    const data = await getMeasurements(childId);
+
+    const sorted = [...data].sort(
+      (a, b) =>
+        new Date(a.date).getTime() -
+        new Date(b.date).getTime()
+    );
+
+    setMeasurements(sorted);
+  } catch (error) {
+    console.error("Failed to load measurements:", error);
+  } finally {
+    setLoadingMeasurements(false);
+  }
+}, []);
+
+const loadInsights = useCallback(async (childId: string) => {
+  try {
+    setLoadingInsights(true);
+
+    const data = await getChildInsights(childId);
+
+    setInsights(data);
+  } catch (error) {
+    console.error("Failed to load child insights:", error);
+    setInsights(null);
+  } finally {
+    setLoadingInsights(false);
+  }
+}, []);
 
 useEffect(() => {
   if (isAuthenticated) {
@@ -625,6 +677,43 @@ useEffect(() => {
   whoHeightData,
 ]);
 
+const dashboardStats = useMemo(() => {
+  let normalCount = 0;
+  let attentionCount = 0;
+  let totalMeasurements = 0;
+
+  children.forEach((child) => {
+    const data = dashboardData[child.id];
+
+    if (!data) {
+      return;
+    }
+
+    totalMeasurements += data.measurements.length;
+
+    if (!data.insights) {
+      return;
+    }
+
+    if (
+      data.insights.status === "requires_attention" ||
+      data.insights.status === "below_expected_growth"
+    ) {
+      attentionCount += 1;
+    } else {
+      normalCount += 1;
+    }
+  });
+
+  return {
+    totalChildren: children.length,
+    normalCount,
+    attentionCount,
+    totalMeasurements,
+  };
+}, [children, dashboardData]);
+
+
 const chartDataWithSimulation = useMemo(() => {
   if (!derived) {
     return chartData;
@@ -814,6 +903,25 @@ const chartDataWithSimulation = useMemo(() => {
                 children.map((child) => {
                   const ageMonths = getAgeInMonths(child.birthDate, new Date());
 
+                  const dashboardChild = dashboardData[child.id];
+
+                  const latestMeasurement =
+                    dashboardChild?.measurements
+                      ? [...dashboardChild.measurements]
+                          .sort(
+                            (a, b) =>
+                              new Date(a.date).getTime() -
+                              new Date(b.date).getTime()
+                          )
+                          .at(-1)
+                      : null;
+
+                  const childInsights = dashboardChild?.insights;
+
+                  const requiresAttention =
+                    childInsights?.status === "requires_attention" ||
+                    childInsights?.status === "below_expected_growth";
+
                   return (
                     <button
                       key={child.id}
@@ -871,17 +979,89 @@ const chartDataWithSimulation = useMemo(() => {
                 историю и графики WHO в одном месте.
               </div>
 
-              <div className="mt-8 rounded-2xl border border-cyan-100 bg-cyan-50 p-4 text-sm leading-6 text-slate-600">
-                Для добавления нового профиля нажми кнопку{" "}
-                <span className="font-semibold text-cyan-700">«Добавить ребёнка»</span> в
-                правом верхнем углу.
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                    Детей
+                  </div>
+
+                  <div className="mt-2 text-3xl font-bold text-slate-900">
+                    {dashboardStats.totalChildren}
+                  </div>
+
+                  <div className="mt-1 text-sm text-slate-500">
+                    Всего профилей
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
+                    В норме
+                  </div>
+
+                  <div className="mt-2 text-3xl font-bold text-emerald-700">
+                    {dashboardStats.normalCount}
+                  </div>
+
+                  <div className="mt-1 text-sm text-emerald-700">
+                    Стабильный рост
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-red-500">
+                    Требуют внимания
+                  </div>
+
+                  <div className="mt-2 text-3xl font-bold text-red-600">
+                    {dashboardStats.attentionCount}
+                  </div>
+
+                  <div className="mt-1 text-sm text-red-600">
+                    Есть сигналы
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-5">
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-600">
+                    Измерений
+                  </div>
+
+                  <div className="mt-2 text-3xl font-bold text-cyan-700">
+                    {dashboardStats.totalMeasurements}
+                  </div>
+
+                  <div className="mt-1 text-sm text-cyan-700">
+                    Всего записей
+                  </div>
+                </div>
               </div>
 
               <div className="mt-10 text-lg font-semibold text-slate-900">Профили детей</div>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      
                 {children.map((child) => {
                   const ageMonths = getAgeInMonths(child.birthDate, new Date());
+
+                  const dashboardChild = dashboardData[child.id];
+
+                  const latestMeasurement =
+                    dashboardChild?.measurements
+                      ? [...dashboardChild.measurements]
+                          .sort(
+                            (a, b) =>
+                              new Date(a.date).getTime() -
+                              new Date(b.date).getTime()
+                          )
+                          .at(-1)
+                      : null;
+
+                  const childInsights = dashboardChild?.insights ?? null;
+
+                  const requiresAttention =
+                    childInsights?.status === "requires_attention" ||
+                    childInsights?.status === "below_expected_growth";
 
                   return (
                     <div
@@ -905,6 +1085,62 @@ const chartDataWithSimulation = useMemo(() => {
                         <div>{formatDate(child.birthDate)}</div>
                         <div>{formatAge(ageMonths)}</div>
                       </div>
+                      <div className="mt-5 grid grid-cols-2 gap-3">
+  <div className="rounded-xl bg-slate-50 p-3">
+    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      Последний рост
+    </div>
+
+    <div className="mt-1 text-lg font-bold text-slate-900">
+      {latestMeasurement
+        ? `${safeNumber(latestMeasurement.height)} см`
+        : "—"}
+    </div>
+  </div>
+
+  <div className="rounded-xl bg-slate-50 p-3">
+    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      Z-score
+    </div>
+
+    <div className="mt-1 text-lg font-bold text-slate-900">
+      {childInsights
+        ? formatZScore(childInsights.latestZScore)
+        : "—"}
+    </div>
+  </div>
+</div>
+
+<div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+    WHO percentile
+  </div>
+
+  <div className="mt-1 font-bold text-slate-900">
+    {childInsights?.latestPercentileBand ?? "—"}
+  </div>
+</div>
+
+<div className="mt-4">
+  {childInsights ? (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${
+        requiresAttention
+          ? "border-red-200 bg-red-50 text-red-600"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+      }`}
+    >
+      {requiresAttention
+        ? "Requires attention"
+        : "Normal trend"}
+    </span>
+  ) : (
+    <span className="text-sm text-slate-400">
+      Нет аналитики
+    </span>
+  )}
+</div>
+                      
 
                       <div className="mt-4 flex gap-3">
                         <button
@@ -920,7 +1156,9 @@ const chartDataWithSimulation = useMemo(() => {
                           onClick={() => void handleDeleteChild(child.id, child.name)}
                           className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-4 py-3 text-red-600 transition hover:bg-red-50"
                           title="Удалить профиль"
+                          
                         >
+                          
                           <Trash2 size={18} />
                         </button>
                       </div>
@@ -931,6 +1169,7 @@ const chartDataWithSimulation = useMemo(() => {
             </div>
           ) : (
             <>
+            
               <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-5">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-cyan-100 bg-cyan-50 text-cyan-600">
