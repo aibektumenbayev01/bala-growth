@@ -903,24 +903,6 @@ const chartDataWithSimulation = useMemo(() => {
                 children.map((child) => {
                   const ageMonths = getAgeInMonths(child.birthDate, new Date());
 
-                  const dashboardChild = dashboardData[child.id];
-
-                  const latestMeasurement =
-                    dashboardChild?.measurements
-                      ? [...dashboardChild.measurements]
-                          .sort(
-                            (a, b) =>
-                              new Date(a.date).getTime() -
-                              new Date(b.date).getTime()
-                          )
-                          .at(-1)
-                      : null;
-
-                  const childInsights = dashboardChild?.insights;
-
-                  const requiresAttention =
-                    childInsights?.status === "requires_attention" ||
-                    childInsights?.status === "below_expected_growth";
 
                   return (
                     <button
