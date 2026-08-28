@@ -1754,7 +1754,25 @@ const chartDataWithSimulation = useMemo(() => {
                   Сохранить профиль
                 </button>
 
-                {isAccountOpen ? (
+               
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateChildOpen(false);
+                    setChildFormError(null);
+                  }}
+                  className="rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+       {isAccountOpen ? (
                   <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
                     onClick={() => setIsAccountOpen(false)}
@@ -1845,22 +1863,7 @@ const chartDataWithSimulation = useMemo(() => {
                     </div>
                   </div>
                 ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreateChildOpen(false);
-                    setChildFormError(null);
-                  }}
-                  className="rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Отмена
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+                
     </div>
   );
 }
