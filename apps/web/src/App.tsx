@@ -122,6 +122,21 @@ function getGrowthVelocityStatus(value: number | null): string {
   return "Нормальный темп";
 }
 
+function getChildAvatar(child: Child) {
+  const avatars =
+    child.gender === "male"
+      ? ["/avatars/boy-1.jpg", "/avatars/boy-2.jpg"]
+      : ["/avatars/girl-1.jpg", "/avatars/girl-2.jpg"];
+
+  let hash = 0;
+
+  for (let i = 0; i < child.id.length; i++) {
+    hash += child.id.charCodeAt(i);
+  }
+
+  return avatars[hash % avatars.length];
+}
+
 function getAnalysisText(
   percentile: string,
   zScore: number | null,
@@ -1300,11 +1315,15 @@ const statusClass = !hasAnalytics
 
                 {/* Child */}
                 <div className="flex items-center gap-4">
-                  <div
-                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border ${avatarClass}`}
-                  >
-                    <Baby size={27} />
-                  </div>
+<div
+  className={`h-16 w-16 shrink-0 overflow-hidden rounded-full border ${avatarClass}`}
+>
+  <img
+    src={getChildAvatar(child)}
+    alt={child.name}
+    className="h-full w-full object-cover"
+  />
+</div>
 
                   <div className="min-w-0">
                     <div className="truncate text-lg font-bold text-slate-900">
