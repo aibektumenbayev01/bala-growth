@@ -301,6 +301,120 @@ app.post("/auth/login", async (req, res) => {
   }
 });
 
+app.post("/auth/demo", async (req, res) => {
+  try {
+    const demoEmail = "demo@growthtrack.kz";
+
+    let user = await prisma.user.findUnique({
+      where: {
+        email: demoEmail,
+      },
+    });
+
+    if (!user) {
+      const randomPassword = `demo-${Date.now()}-${Math.random()}`;
+
+      const passwordHash = await bcrypt.hash(
+        randomPassword,
+        10
+      );
+
+      user = await prisma.user.create({
+        data: {
+          email: demoEmail,
+          passwordHash,
+        },
+      });
+    }
+
+    // Reset demo data every time somebody opens Demo
+    const existingChildren = await prisma.child.findMany({
+      where: {
+        userId: user.id,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const childIds = existingChildren.map(
+      (child) => child.id
+    );
+
+    if (childIds.length > 0) {
+      await prisma.measurement.deleteMany({
+        where: {
+          childId: {
+            in: childIds,
+          },
+        },
+      });
+
+      await prisma.child.deleteMany({
+        where: {
+          userId: user.id,
+        },
+      });
+    }
+
+    const demoChild = await prisma.child.create({
+      data: {
+        userId: user.id,
+        name: "Demo Child",
+        gender: "male",
+        birthDate: new Date("2018-02-15T00:00:00.000Z"),
+      },
+    });
+
+    await prisma.measurement.createMany({
+      data: [
+        {
+          childId: demoChild.id,
+          date: new Date("2024-08-26T00:00:00.000Z"),
+          height: 112,
+          weight: 20,
+        },
+        {
+          childId: demoChild.id,
+          date: new Date("2025-08-26T00:00:00.000Z"),
+          height: 117,
+          weight: 22,
+        },
+        {
+          childId: demoChild.id,
+          date: new Date("2026-08-26T00:00:00.000Z"),
+          height: 119,
+          weight: 24,
+        },
+      ],
+    });
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "2h",
+      }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Demo login error:", error);
+
+    return res.status(500).json({
+      error: "Failed to start demo account",
+    });
+  }
+});
+
 // ======================================================
 // CHILDREN
 // ======================================================
