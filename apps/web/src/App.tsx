@@ -554,10 +554,13 @@ async function handleDemoLogin() {
         birthDate,
       });
 
-      setChildren((prev) => [...prev, created]);
-      setSelectedChildId(created.id);
-      setIsCreateChildOpen(false);
+      
+      const updatedChildren = [...children, created];
 
+      setChildren(updatedChildren);
+      setSelectedChildId(created.id);
+
+      await loadDashboardData(updatedChildren);
       setChildName("");
       setChildGender("male");
       setNewBirthDate("");
@@ -605,6 +608,8 @@ async function handleDemoLogin() {
 
       await loadMeasurements(selectedChildId);
       await loadInsights(selectedChildId);
+      await loadDashboardData(children);
+
     } catch (error) {
       console.error("Failed to create measurement:", error);
     } finally {

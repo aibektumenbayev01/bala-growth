@@ -311,6 +311,7 @@ app.post("/auth/demo", async (req, res) => {
       },
     });
 
+    // Create demo account only once
     if (!user) {
       const randomPassword = `demo-${Date.now()}-${Math.random()}`;
 
@@ -325,69 +326,40 @@ app.post("/auth/demo", async (req, res) => {
           passwordHash,
         },
       });
-    }
 
-    // Reset demo data every time somebody opens Demo
-    const existingChildren = await prisma.child.findMany({
-      where: {
-        userId: user.id,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const childIds = existingChildren.map(
-      (child) => child.id
-    );
-
-    if (childIds.length > 0) {
-      await prisma.measurement.deleteMany({
-        where: {
-          childId: {
-            in: childIds,
-          },
-        },
-      });
-
-      await prisma.child.deleteMany({
-        where: {
+      // Create initial demo child only once
+      const demoChild = await prisma.child.create({
+        data: {
           userId: user.id,
+          name: "Demo Child",
+          gender: "male",
+          birthDate: new Date("2018-02-15T00:00:00.000Z"),
         },
       });
+
+      await prisma.measurement.createMany({
+        data: [
+          {
+            childId: demoChild.id,
+            date: new Date("2024-08-26T00:00:00.000Z"),
+            height: 112,
+            weight: 20,
+          },
+          {
+            childId: demoChild.id,
+            date: new Date("2025-08-26T00:00:00.000Z"),
+            height: 117,
+            weight: 22,
+          },
+          {
+            childId: demoChild.id,
+            date: new Date("2026-08-26T00:00:00.000Z"),
+            height: 119,
+            weight: 24,
+          },
+        ],
+      });
     }
-
-    const demoChild = await prisma.child.create({
-      data: {
-        userId: user.id,
-        name: "Demo Child",
-        gender: "male",
-        birthDate: new Date("2018-02-15T00:00:00.000Z"),
-      },
-    });
-
-    await prisma.measurement.createMany({
-      data: [
-        {
-          childId: demoChild.id,
-          date: new Date("2024-08-26T00:00:00.000Z"),
-          height: 112,
-          weight: 20,
-        },
-        {
-          childId: demoChild.id,
-          date: new Date("2025-08-26T00:00:00.000Z"),
-          height: 117,
-          weight: 22,
-        },
-        {
-          childId: demoChild.id,
-          date: new Date("2026-08-26T00:00:00.000Z"),
-          height: 119,
-          weight: 24,
-        },
-      ],
-    });
 
     const token = jwt.sign(
       {
