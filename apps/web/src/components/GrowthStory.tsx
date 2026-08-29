@@ -18,10 +18,10 @@ export default function GrowthStory({
   );
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-slate-900">
           Growth Story
         </h2>
 
@@ -32,11 +32,11 @@ export default function GrowthStory({
 
       {/* Empty state */}
       {sortedMeasurements.length === 0 ? (
-        <div className="text-slate-500">
+        <div className="text-sm text-slate-500">
           Пока недостаточно измерений для Growth Story.
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-2">
           {sortedMeasurements.map((measurement, index) => {
             const previousMeasurement =
               index > 0
@@ -90,149 +90,149 @@ export default function GrowthStory({
             return (
               <div
                 key={measurement.id}
-                className="flex gap-4"
+                className="flex gap-3"
               >
                 {/* Timeline */}
-                <div className="flex flex-col items-center">
+                <div className="flex w-4 shrink-0 flex-col items-center">
                   <div
-                    className={`h-4 w-4 rounded-full ${
+                    className={`mt-1 h-3 w-3 shrink-0 rounded-full ${
                       isLatest
-                        ? "bg-cyan-600 ring-4 ring-cyan-100"
+                        ? "bg-cyan-600 ring-2 ring-cyan-100"
                         : "bg-cyan-400"
                     }`}
                   />
 
                   {index < sortedMeasurements.length - 1 && (
-                    <div className="h-full min-h-20 w-0.5 bg-cyan-100" />
+                    <div className="min-h-12 w-px flex-1 bg-cyan-100" />
                   )}
                 </div>
 
                 {/* Measurement */}
-                <div className="w-full pb-6">
+                <div className="min-w-0 flex-1 pb-3">
+                  {/* Date + latest */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="text-sm text-slate-400">
+                    <div className="text-xs text-slate-400">
                       {new Date(
                         measurement.date
                       ).toLocaleDateString()}
                     </div>
 
                     {isLatest && (
-                      <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-semibold text-cyan-700">
+                      <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-700">
                         Latest
                       </span>
                     )}
                   </div>
 
-                  <div className="mt-1 text-xl font-bold text-slate-900">
-                    {Number(measurement.height)} см
+                  {/* Height + weight */}
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <div className="text-lg font-bold text-slate-900">
+                      {Number(measurement.height)} см
+                    </div>
+
+                    <div className="text-sm text-slate-500">
+                      {Number(measurement.weight)} кг
+                    </div>
                   </div>
 
-                  <div className="text-sm text-slate-500">
-                    {Number(measurement.weight)} кг
-                  </div>
-
-                  {/* Height difference */}
+                  {/* Growth information */}
                   {heightChange !== null && (
-                    <div
-                      className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                        heightChange < 0
-                          ? "bg-red-50 text-red-600"
-                          : "bg-emerald-50 text-emerald-600"
-                      }`}
-                    >
-                      {heightChange > 0 ? "+" : ""}
-                      {heightChange.toFixed(1)} см
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          heightChange < 0
+                            ? "bg-red-50 text-red-600"
+                            : "bg-emerald-50 text-emerald-600"
+                        }`}
+                      >
+                        {heightChange > 0 ? "+" : ""}
+                        {heightChange.toFixed(1)} см
+                      </span>
+
+                      {monthsBetween !== null && (
+                        <span className="text-xs text-slate-500">
+                          за {monthsBetween} мес
+                        </span>
+                      )}
+
+                      {annualizedGrowth !== null && (
+                        <span
+                          className={`text-xs font-semibold ${
+                            annualizedGrowth < 0
+                              ? "text-red-600"
+                              : annualizedGrowth < 4
+                                ? "text-amber-600"
+                                : "text-emerald-600"
+                          }`}
+                        >
+                          {annualizedGrowth} см/год
+                        </span>
+                      )}
+
+                      {growthStatus && (
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                            growthStatus === "Measurement anomaly"
+                              ? "bg-red-50 text-red-600"
+                              : growthStatus === "Slow growth"
+                                ? "bg-amber-50 text-amber-700"
+                                : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {growthStatus}
+                        </span>
+                      )}
                     </div>
                   )}
 
-                  {/* Time between measurements */}
-                  {monthsBetween !== null && (
-                    <div className="mt-2 text-sm text-slate-500">
-                      За {monthsBetween} мес
-                    </div>
-                  )}
-
-                  {/* Annualized growth */}
-                  {annualizedGrowth !== null && (
-                    <div
-                      className={`mt-1 text-sm font-semibold ${
-                        annualizedGrowth < 0
-                          ? "text-red-600"
-                          : annualizedGrowth < 4
-                            ? "text-amber-600"
-                            : "text-emerald-600"
-                      }`}
-                    >
-                      Темп: {annualizedGrowth} см/год
-                    </div>
-                  )}
-
-                  {/* Growth status */}
-                  {growthStatus && (
-                    <div
-                      className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        growthStatus ===
-                        "Measurement anomaly"
-                          ? "bg-red-50 text-red-600"
-                          : growthStatus === "Slow growth"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-emerald-50 text-emerald-700"
-                      }`}
-                    >
-                      {growthStatus}
-                    </div>
-                  )}
-
-                  {/* Impossible / suspicious height decrease */}
+                  {/* Suspicious height decrease */}
                   {heightChange !== null &&
                     heightChange < 0 && (
-                      <div className="mt-2 text-sm font-semibold text-red-600">
+                      <div className="mt-2 text-xs font-semibold text-red-600">
                         ⚠ Height decreased — check measurement
                       </div>
                     )}
 
                   {/* Intelligence for latest measurement */}
                   {isLatest && insights && (
-                    <div className="mt-5 rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
-                      <div className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">
+                    <div className="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/70 p-3">
+                      <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-700">
                         Current Growth Intelligence
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="grid gap-2 sm:grid-cols-3">
                         {/* Percentile */}
                         <div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-[11px] text-slate-500">
                             WHO percentile
                           </div>
 
-                          <div className="mt-1 font-bold text-slate-900">
+                          <div className="mt-0.5 text-sm font-bold text-slate-900">
                             {insights.latestPercentileBand}
                           </div>
                         </div>
 
                         {/* Z-score */}
                         <div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-[11px] text-slate-500">
                             Z-score
                           </div>
 
-                          <div className="mt-1 font-bold text-slate-900">
+                          <div className="mt-0.5 text-sm font-bold text-slate-900">
                             {insights.latestZScore !== null
-                              ? insights.latestZScore.toFixed(
-                                  2
-                                )
+                              ? insights.latestZScore.toFixed(2)
                               : "—"}
                           </div>
                         </div>
 
                         {/* Overall status */}
                         <div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-[11px] text-slate-500">
                             Status
                           </div>
 
                           <div
-                            className={`mt-1 font-bold ${
+                            className={`mt-0.5 text-sm font-bold ${
                               insights.status ===
                               "requires_attention"
                                 ? "text-red-600"
@@ -254,7 +254,7 @@ export default function GrowthStory({
                       </div>
 
                       {/* Backend-generated summary */}
-                      <div className="mt-4 border-t border-cyan-100 pt-4 text-sm leading-6 text-slate-600">
+                      <div className="mt-2 border-t border-cyan-100 pt-2 text-xs leading-5 text-slate-600">
                         {insights.summary}
                       </div>
                     </div>

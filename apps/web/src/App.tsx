@@ -705,6 +705,7 @@ const selectedChildAgeMonths = useMemo(() => {
 }, [selectedChild]);
 
 
+
   const childMeasurements = useMemo(() => {
     if (!selectedChild) return [];
 
@@ -1019,7 +1020,7 @@ return (
     <div className="mx-auto flex min-h-screen max-w-[1500px] bg-white shadow-sm">
 
       {/* SIDEBAR */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-5 py-6">
+<aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-5 py-6">
 
         {/* Logo */}
         <div className="mb-10 flex items-center gap-3">
@@ -1184,10 +1185,10 @@ return (
         </header>
 
         {/* Existing content */}
-        <div className="p-8">
-          <section className="space-y-8">
+<div className="mx-auto w-full max-w-6xl p-6">
+            <section className="space-y-5">
           {!selectedChild ? (
-         <div className="space-y-7">
+         <div className="space-y-5">
 
   {/* YOUR CHILDREN */}
   <section>
@@ -1936,7 +1937,7 @@ const statusClass = !hasAnalytics
               </div>
 
               <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div
