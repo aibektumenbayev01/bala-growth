@@ -16,7 +16,18 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+
+  // Dashboard sidebar
+  Home,
+  Users,
+  SquarePlus,
+  ChartNoAxesCombined,
+  BookOpen,
+  Sparkles,
+  FileText,
+  LogOut,
 } from "lucide-react";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -295,7 +306,7 @@ const [changingPassword, setChangingPassword] =
     Record<string, DashboardChildData>
   >({});
 
-  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [, setLoadingChildren] = useState(true);
   const [loadingMeasurements, setLoadingMeasurements] = useState(false);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [submittingChild, setSubmittingChild] = useState(false);
@@ -979,131 +990,185 @@ const chartDataWithSimulation = useMemo(() => {
                         ? "Нет аккаунта? Зарегистрироваться"
                         : "Уже есть аккаунт? Войти"}
                     </button>
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMode(authMode === "login" ? "register" : "login");
-            setAuthError(null);
-          }}
-          className="mt-5 w-full text-sm font-semibold text-cyan-600"
-        >
-          {authMode === "login"
-            ? "Нет аккаунта? Зарегистрироваться"
-            : "Уже есть аккаунт? Войти"}
-        </button>
       </div>
     </div>
   );
 }
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-sm">
-              <Activity size={22} />
-            </div>
-            <div>
-              <div className="text-2xl font-bold">GrowthTrack KZ</div>
-              <div className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">
-                Pediatric Health Platform
-              </div>
-            </div>
+return (
+  <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="mx-auto flex min-h-screen max-w-[1500px] bg-white shadow-sm">
+
+      {/* SIDEBAR */}
+      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white px-5 py-6">
+
+        {/* Logo */}
+        <div className="mb-10 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500 text-white">
+            <Activity size={20} />
+          </div>
+
+          <div className="font-bold text-slate-900">
+            GrowthTrack KZ
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="space-y-2">
+
+          <button
+            type="button"
+            onClick={() => setSelectedChildId(null)}
+            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold transition ${
+              selectedChildId === null
+                ? "bg-cyan-50 text-cyan-600"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Home size={18} />
+            Dashboard
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedChildId(null)}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <Users size={18} />
+            Children
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (children.length > 0) {
+                setSelectedChildId(children[0].id);
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <SquarePlus size={18} />
+            Add Measurement
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (children.length > 0) {
+                setSelectedChildId(children[0].id);
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <ChartNoAxesCombined size={18} />
+            Growth Charts
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (children.length > 0) {
+                setSelectedChildId(children[0].id);
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <BookOpen size={18} />
+            Growth Story
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (children.length > 0) {
+                setSelectedChildId(children[0].id);
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <Sparkles size={18} />
+            Simulator
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (children.length > 0) {
+                setSelectedChildId(children[0].id);
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <FileText size={18} />
+            Reports
+          </button>
+        </nav>
+
+        {/* Bottom */}
+        <div className="mt-auto space-y-2 pt-8">
+
+          <button
+            type="button"
+            onClick={() => setIsAccountOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <User size={18} />
+            Account
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <main className="min-w-0 flex-1">
+
+        {/* Header */}
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Dashboard
+            </h1>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Overview of your children's growth
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsAccountOpen(true)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50"
-              >
-                <User size={18} />
-                Account
-              </button>
-
             <button
               type="button"
               onClick={() => {
                 setChildFormError(null);
                 setIsCreateChildOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-600"
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-600"
             >
-              <PlusCircle size={18} />
-              Добавить ребёнка
+              <PlusCircle size={17} />
+              Add Child
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsAccountOpen(true)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-200 text-cyan-600 transition hover:bg-cyan-50"
+            >
+              <User size={19} />
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto grid max-w-[1280px] grid-cols-1 gap-6 px-5 py-6 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
-              Dashboard
-            </div>
-
-            <div className="space-y-3">
-              {loadingChildren ? (
-                <div className="flex items-center gap-2 text-slate-500">
-                  <Loader2 size={18} className="animate-spin" />
-                  Загрузка...
-                </div>
-              ) : children.length === 0 ? (
-                <div className="text-sm text-slate-500">Пока нет профилей детей.</div>
-              ) : (
-                children.map((child) => {
-                  const ageMonths = getAgeInMonths(child.birthDate, new Date());
-
-
-                  return (
-                    <button
-                      key={child.id}
-                      type="button"
-                      onClick={() => setSelectedChildId(child.id)}
-                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${
-                        selectedChildId === child.id
-                          ? "border-cyan-200 bg-cyan-50"
-                          : "border-slate-200 bg-white hover:border-slate-300"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
-                          <Baby size={18} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="truncate text-base font-semibold text-slate-900">
-                            {child.name}
-                          </div>
-                          <div className="text-sm text-slate-500">
-                            {getGenderLabel(child.gender as Gender)}
-                          </div>
-                          <div className="mt-1 text-sm text-slate-500">
-                            {formatAge(ageMonths)}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-cyan-100 bg-cyan-50 p-5 shadow-sm">
-            <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-cyan-700">
-              Reminder
-            </div>
-            <div className="text-sm leading-6 text-slate-600">
-              Следующее измерение желательно внести через 2–4 недели, если есть
-              отклонения по росту или темпу роста.
-            </div>
-          </div>
-        </aside>
-
-        <section className="space-y-8">
+        {/* Existing content */}
+        <div className="p-8">
+          <section className="space-y-8">
           {!selectedChild ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
               <div className="text-3xl font-bold text-slate-900">
@@ -1802,7 +1867,9 @@ const chartDataWithSimulation = useMemo(() => {
             </>
           )}
         </section>
+      </div>
       </main>
+      
 
       {isCreateChildOpen ? (
         <div
@@ -2163,8 +2230,9 @@ const chartDataWithSimulation = useMemo(() => {
                     </form>
                   </div>
                 </div>
-              ) : null}
-                
+                   ) : null}
+
     </div>
-  );
+  </div>
+);
 }
