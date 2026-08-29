@@ -800,27 +800,23 @@ async function handleDemoLogin() {
 
 const dashboardStats = useMemo(() => {
   let normalCount = 0;
-  let attentionCount = 0;
+  let monitoringCount = 0;
+  let checkupCount = 0;
   let totalMeasurements = 0;
 
   children.forEach((child) => {
     const data = dashboardData[child.id];
 
-    if (!data) {
-      return;
-    }
+    if (!data) return;
 
     totalMeasurements += data.measurements.length;
 
-    if (!data.insights) {
-      return;
-    }
+    if (!data.insights) return;
 
-    if (
-      data.insights.status === "requires_attention" ||
-      data.insights.status === "below_expected_growth"
-    ) {
-      attentionCount += 1;
+    if (data.insights.status === "requires_attention") {
+      checkupCount += 1;
+    } else if (data.insights.status === "below_expected_growth") {
+      monitoringCount += 1;
     } else {
       normalCount += 1;
     }
@@ -829,7 +825,8 @@ const dashboardStats = useMemo(() => {
   return {
     totalChildren: children.length,
     normalCount,
-    attentionCount,
+    monitoringCount,
+    checkupCount,
     totalMeasurements,
   };
 }, [children, dashboardData]);
@@ -1170,203 +1167,371 @@ return (
         <div className="p-8">
           <section className="space-y-8">
           {!selectedChild ? (
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-              <div className="text-3xl font-bold text-slate-900">
-                Мониторинг роста детей
-              </div>
-              <div className="mt-3 max-w-2xl text-lg leading-8 text-slate-500">
-                Добавляй профили детей, сохраняй измерения роста и веса, смотри
-                историю и графики WHO в одном месте.
-              </div>
+         <div className="space-y-7">
 
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-                    Детей
-                  </div>
+  {/* YOUR CHILDREN */}
+  <section>
+    <div className="mb-5 flex items-center justify-between">
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">
+          Your Children ({children.length})
+        </h2>
+      </div>
 
-                  <div className="mt-2 text-3xl font-bold text-slate-900">
-                    {dashboardStats.totalChildren}
-                  </div>
-
-                  <div className="mt-1 text-sm text-slate-500">
-                    Всего профилей
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
-                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">
-                    В норме
-                  </div>
-
-                  <div className="mt-2 text-3xl font-bold text-emerald-700">
-                    {dashboardStats.normalCount}
-                  </div>
-
-                  <div className="mt-1 text-sm text-emerald-700">
-                    Стабильный рост
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
-                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-red-500">
-                    Требуют внимания
-                  </div>
-
-                  <div className="mt-2 text-3xl font-bold text-red-600">
-                    {dashboardStats.attentionCount}
-                  </div>
-
-                  <div className="mt-1 text-sm text-red-600">
-                    Есть сигналы
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-5">
-                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-600">
-                    Измерений
-                  </div>
-
-                  <div className="mt-2 text-3xl font-bold text-cyan-700">
-                    {dashboardStats.totalMeasurements}
-                  </div>
-
-                  <div className="mt-1 text-sm text-cyan-700">
-                    Всего записей
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-10 text-lg font-semibold text-slate-900">Профили детей</div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      
-                {children.map((child) => {
-                  const ageMonths = getAgeInMonths(child.birthDate, new Date());
-
-                  const dashboardChild = dashboardData[child.id];
-
-                  const latestMeasurement =
-                    dashboardChild?.measurements
-                      ? [...dashboardChild.measurements]
-                          .sort(
-                            (a, b) =>
-                              new Date(a.date).getTime() -
-                              new Date(b.date).getTime()
-                          )
-                          .at(-1)
-                      : null;
-
-                  const childInsights = dashboardChild?.insights ?? null;
-
-                  const requiresAttention =
-                    childInsights?.status === "requires_attention" ||
-                    childInsights?.status === "below_expected_growth";
-
-                  return (
-                    <div
-                      key={child.id}
-                      className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-600">
-                          <Baby size={24} />
-                        </div>
-
-                        <div>
-                          <div className="text-2xl font-bold text-slate-900">{child.name}</div>
-                          <div className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                            {child.gender === "male" ? "Мальчик" : "Девочка"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 space-y-2 text-slate-500">
-                        <div>{formatDate(child.birthDate)}</div>
-                        <div>{formatAge(ageMonths)}</div>
-                      </div>
-                      <div className="mt-5 grid grid-cols-2 gap-3">
-  <div className="rounded-xl bg-slate-50 p-3">
-    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-      Последний рост
+      <button
+        type="button"
+        onClick={() => {
+          setChildFormError(null);
+          setIsCreateChildOpen(true);
+        }}
+        className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2 text-sm font-semibold text-cyan-600 transition hover:bg-cyan-50"
+      >
+        <PlusCircle size={17} />
+        Add Child
+      </button>
     </div>
 
-    <div className="mt-1 text-lg font-bold text-slate-900">
-      {latestMeasurement
-        ? `${safeNumber(latestMeasurement.height)} см`
-        : "—"}
-    </div>
-  </div>
+    {children.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <Baby size={30} className="mx-auto text-slate-300" />
 
-  <div className="rounded-xl bg-slate-50 p-3">
-    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-      Z-score
-    </div>
+        <div className="mt-3 font-semibold text-slate-700">
+          No children yet
+        </div>
 
-    <div className="mt-1 text-lg font-bold text-slate-900">
-      {childInsights
-        ? formatZScore(childInsights.latestZScore)
-        : "—"}
-    </div>
-  </div>
-</div>
+        <div className="mt-1 text-sm text-slate-500">
+          Add your first child to start tracking growth.
+        </div>
+      </div>
+    ) : (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {children.map((child) => {
+          const ageMonths = getAgeInMonths(
+            child.birthDate,
+            new Date()
+          );
 
-<div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-  <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-    WHO percentile
-  </div>
+          const dashboardChild = dashboardData[child.id];
 
-  <div className="mt-1 font-bold text-slate-900">
-    {childInsights?.latestPercentileBand ?? "—"}
-  </div>
-</div>
+          const latestMeasurement =
+            dashboardChild?.measurements
+              ? [...dashboardChild.measurements]
+                  .sort(
+                    (a, b) =>
+                      new Date(a.date).getTime() -
+                      new Date(b.date).getTime()
+                  )
+                  .at(-1)
+              : null;
 
-<div className="mt-4">
-  {childInsights ? (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${
-        requiresAttention
-          ? "border-red-200 bg-red-50 text-red-600"
-          : "border-emerald-200 bg-emerald-50 text-emerald-700"
-      }`}
-    >
-      {requiresAttention
-        ? "Requires attention"
-        : "Normal trend"}
-    </span>
-  ) : (
-    <span className="text-sm text-slate-400">
-      Нет аналитики
-    </span>
-  )}
-</div>
-                      
+          const childInsights =
+            dashboardChild?.insights ?? null;
 
-                      <div className="mt-4 flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedChildId(child.id)}
-                          className="flex-1 rounded-2xl border border-slate-200 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
-                        >
-                          Открыть профиль
-                        </button>
+          const status =
+            childInsights?.status ?? "normal";
 
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteChild(child.id, child.name)}
-                          className="inline-flex items-center justify-center rounded-2xl border border-red-200 px-4 py-3 text-red-600 transition hover:bg-red-50"
-                          title="Удалить профиль"
-                          
-                        >
-                          
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+          const isCheckup =
+            status === "requires_attention";
+
+          const isMonitoring =
+            status === "below_expected_growth";
+
+          const cardBorder = isCheckup
+            ? "border-red-200"
+            : isMonitoring
+              ? "border-amber-200"
+              : "border-emerald-200";
+
+          const avatarClass = isCheckup
+            ? "border-red-200 bg-red-50 text-red-500"
+            : isMonitoring
+              ? "border-amber-200 bg-amber-50 text-amber-500"
+              : "border-emerald-200 bg-emerald-50 text-emerald-600";
+
+          const statusClass = isCheckup
+            ? "bg-red-50 text-red-600"
+            : isMonitoring
+              ? "bg-amber-50 text-amber-600"
+              : "bg-emerald-50 text-emerald-600";
+
+          const statusText = isCheckup
+            ? "Needs Check-up"
+            : isMonitoring
+              ? "Requires Monitoring"
+              : "All Good";
+
+          return (
+            <div
+              key={child.id}
+              className={`overflow-hidden rounded-2xl border bg-white transition hover:-translate-y-0.5 hover:shadow-md ${cardBorder}`}
+            >
+              <div className="p-5">
+
+                {/* Child */}
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border ${avatarClass}`}
+                  >
+                    <Baby size={27} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="truncate text-lg font-bold text-slate-900">
+                      {child.name}
                     </div>
-                  );
-                })}
+
+                    <div className="mt-1 text-sm text-slate-500">
+                      {child.gender === "male"
+                        ? "Male"
+                        : "Female"}
+                      , {formatAge(ageMonths)}
+                    </div>
+
+                    <div className="mt-1 text-sm text-slate-500">
+                      Born: {formatDate(child.birthDate)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div
+                  className={`mt-5 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${statusClass}`}
+                >
+                  <span className="text-lg">●</span>
+                  {statusText}
+                </div>
+
+                {/* Measurement */}
+                <div className="mt-5 space-y-2 text-base text-slate-600">
+                  <div>
+                    Height:{" "}
+                    <span className="font-semibold text-slate-800">
+                      {latestMeasurement
+                        ? `${safeNumber(
+                            latestMeasurement.height
+                          )} cm`
+                        : "—"}
+                    </span>
+
+                    {childInsights ? (
+                      <span
+                        className={`ml-2 font-bold ${
+                          isCheckup
+                            ? "text-red-500"
+                            : isMonitoring
+                              ? "text-amber-500"
+                              : "text-emerald-600"
+                        }`}
+                      >
+                        ({childInsights.latestPercentileBand})
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    Weight:{" "}
+                    <span className="font-semibold text-slate-800">
+                      {latestMeasurement
+                        ? `${safeNumber(
+                            latestMeasurement.weight
+                          )} kg`
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* Button */}
+            {/* Card actions */}
+                <div className="flex border-t border-slate-100 bg-slate-50/70">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedChildId(child.id)}
+                    className="flex flex-1 items-center justify-center gap-2 px-5 py-3.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+                  >
+                    View Details
+                    <span>→</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleDeleteChild(child.id, child.name)
+                    }
+                    className="flex items-center justify-center border-l border-slate-200 px-4 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                    title="Delete child"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
             </div>
+          );
+        })}
+      </div>
+    )}
+  </section>
+
+  {/* BOTTOM GRID */}
+  <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.9fr)]">
+
+    {/* GROWTH SUMMARY */}
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-bold text-slate-900">
+        Growth Summary
+      </h2>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+
+        {/* GOOD */}
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
+            <span>●</span>
+            All Good
+          </div>
+
+          <div className="mt-5 text-center">
+            <div className="text-3xl font-bold text-slate-900">
+              {dashboardStats.normalCount}
+            </div>
+
+            <div className="mt-1 text-sm text-slate-500">
+              {dashboardStats.normalCount === 1
+                ? "child"
+                : "children"}
+            </div>
+          </div>
+        </div>
+
+        
+
+        {/* MONITORING */}
+        <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-amber-600">
+            <span>●</span>
+            Requires Monitoring
+          </div>
+
+          <div className="mt-5 text-center">
+            <div className="text-3xl font-bold text-slate-900">
+              {dashboardStats.monitoringCount}
+            </div>
+
+            <div className="mt-1 text-sm text-slate-500">
+              {dashboardStats.monitoringCount === 1
+                ? "child"
+                : "children"}
+            </div>
+          </div>
+        </div>
+        
+        
+
+        {/* CHECKUP */}
+        <div className="rounded-xl border border-red-100 bg-red-50/60 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-red-600">
+            <span>●</span>
+            Needs Check-up
+          </div>
+
+          <div className="mt-5 text-center">
+            <div className="text-3xl font-bold text-slate-900">
+              {dashboardStats.checkupCount}
+            </div>
+
+            <div className="mt-1 text-sm text-slate-500">
+              {dashboardStats.checkupCount === 1
+                ? "child"
+                : "children"}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* QUICK ACTIONS */}
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-bold text-slate-900">
+        Quick Actions
+      </h2>
+
+      <div className="mt-4 divide-y divide-slate-100">
+
+        <button
+          type="button"
+          onClick={() => {
+            if (children.length > 0) {
+              setSelectedChildId(children[0].id);
+            }
+          }}
+          className="flex w-full items-center justify-between py-4 text-left"
+        >
+          <div className="flex items-center gap-3 font-semibold text-cyan-600">
+            <PlusCircle size={18} />
+            Add Measurement
+          </div>
+
+          <span className="text-slate-400">›</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (children.length > 0) {
+              setSelectedChildId(children[0].id);
+            }
+          }}
+          className="flex w-full items-center justify-between py-4 text-left"
+        >
+          <div className="flex items-center gap-3 font-semibold text-cyan-600">
+            <ChartNoAxesCombined size={18} />
+            View Growth Charts
+          </div>
+
+          <span className="text-slate-400">›</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (children.length > 0) {
+              setSelectedChildId(children[0].id);
+            }
+          }}
+          className="flex w-full items-center justify-between py-4 text-left"
+        >
+          <div className="flex items-center gap-3 font-semibold text-cyan-600">
+            <FileText size={18} />
+            Generate Report
+          </div>
+
+          <span className="text-slate-400">›</span>
+        </button>
+
+      </div>
+    </section>
+  </div>
+
+  {/* DEMO BANNER */}
+  {currentUser?.email === "demo@growthtrack.kz" ? (
+    <div className="flex items-start gap-4 rounded-2xl border border-blue-200 bg-blue-50/50 px-5 py-4">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+        <Activity size={18} />
+      </div>
+
+      <div>
+        <div className="font-semibold text-blue-600">
+          This is a demo account
+        </div>
+
+        <div className="mt-1 text-sm text-slate-500">
+          You can explore all features with sample data.
+          Demo data may be reset between sessions.
+        </div>
+      </div>
+    </div>
+  ) : null}
+
+</div>
           ) : (
             <>
             
