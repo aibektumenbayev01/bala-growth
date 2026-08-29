@@ -1,23 +1,24 @@
 # GrowthTrack KZ
 
-A full-stack pediatric growth monitoring application for tracking children's height and weight and analyzing growth using WHO growth standards.
+A full-stack pediatric growth monitoring application for tracking children's height and weight using WHO growth standards.
 
 🔗 **Live Demo:** https://bala-growth.onrender.com  
-Click **Try Demo** to explore the application without registration.
+Click **Try Demo** to explore without registration.
 
-> Educational portfolio project. Not intended for medical diagnosis.
+## Demo
+
+![GrowthTrack KZ Demo](docs/demo.gif)
 
 ## Features
 
-- Child profiles and measurement history
-- WHO percentile and Z-score analysis
-- Growth velocity tracking and status indicators
-- Interactive WHO growth charts
+- WHO percentile & Z-score analysis
+- Growth velocity tracking
+- Interactive growth charts
 - Growth Story timeline
 - Growth Simulator
-- PDF growth reports
-- JWT authentication and protected user data
-- Demo account
+- PDF reports
+- JWT authentication
+- Persistent demo account
 
 ## Tech Stack
 
@@ -37,66 +38,9 @@ React + TypeScript
         ↓
 Node.js + Express
         ↓
-    Prisma ORM
+    Prisma
         ↓
-    PostgreSQL
+ PostgreSQL
 ```
 
-Monorepo structure:
-
-```text
-apps/
-├── web/        # React frontend
-└── api/        # Express backend
-
-packages/
-└── shared/     # Shared TypeScript types
-```
-
-## Running Locally
-
-```bash
-git clone <YOUR_REPO_URL>
-cd bala-growth
-pnpm install
-```
-
-Create `apps/web/.env`:
-
-```env
-VITE_API_URL=http://localhost:3001
-```
-
-Create `apps/api/.env`:
-
-```env
-DATABASE_URL="your-postgresql-url"
-JWT_SECRET="your-secret"
-```
-
-Then:
-
-```bash
-pnpm --filter api exec prisma generate
-pnpm --filter api exec prisma migrate dev
-```
-
-Run the API and frontend:
-
-```bash
-cd apps/api
-pnpm dev
-```
-
-```bash
-cd apps/web
-pnpm dev
-```
-
-## Testing
-
-```bash
-pnpm --filter api test
-```
-
-Backend tests cover authentication, validation, protected resources, and core API behavior.
+> Educational portfolio project. Not intended for medical diagnosis.
