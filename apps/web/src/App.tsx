@@ -179,6 +179,13 @@ function getAnomalyFlagLabel(flag: GrowthAnomalyFlag): string {
   return "Possible stunting risk";
 }
 
+function scrollToSection(sectionId: string) {
+  document.getElementById(sectionId)?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
 type StatCardProps = {
   icon: ReactNode;
   title: string;
@@ -295,6 +302,7 @@ const [changingPassword, setChangingPassword] =
 
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const [pendingSection, setPendingSection] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [insights, setInsights] = useState<ChildGrowthInsights | null>(null);
   type DashboardChildData = {
@@ -420,6 +428,8 @@ useEffect(() => {
   }
 }, [isAuthenticated, loadChildren]);
 
+
+
   useEffect(() => {
     if (!selectedChildId) {
       setMeasurements([]);
@@ -431,7 +441,7 @@ useEffect(() => {
     void loadInsights(selectedChildId);
   }, [selectedChildId, loadMeasurements, loadInsights]);
 
-  function handleLogout() {
+ function handleLogout() {
   logout();
 
   setIsAuthenticated(false);
@@ -675,13 +685,25 @@ async function handleDemoLogin() {
     }
   }
 
-  const selectedChild =
-    children.find((child) => child.id === selectedChildId) ?? null;
+ const selectedChild =
+  children.find((child) => child.id === selectedChildId) ?? null;
 
-  const selectedChildAgeMonths = useMemo(() => {
-    if (!selectedChild) return 0;
-    return getAgeInMonths(selectedChild.birthDate, new Date());
-  }, [selectedChild]);
+useEffect(() => {
+  if (!selectedChild || !pendingSection) return;
+
+  const timer = window.setTimeout(() => {
+    scrollToSection(pendingSection);
+    setPendingSection(null);
+  }, 100);
+
+  return () => window.clearTimeout(timer);
+}, [selectedChild, pendingSection]);
+
+const selectedChildAgeMonths = useMemo(() => {
+  if (!selectedChild) return 0;
+  return getAgeInMonths(selectedChild.birthDate, new Date());
+}, [selectedChild]);
+
 
   const childMeasurements = useMemo(() => {
     if (!selectedChild) return [];
@@ -1011,95 +1033,93 @@ return (
         </div>
 
         {/* Navigation */}
-        <nav className="space-y-2">
+       <nav className="space-y-2">
+  {/* MAIN */}
+  <button
+    type="button"
+    onClick={() => setSelectedChildId(null)}
+    className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold transition ${
+      selectedChildId === null
+        ? "bg-cyan-50 text-cyan-600"
+        : "text-slate-600 hover:bg-slate-50"
+    }`}
+  >
+    <Home size={18} />
+    Dashboard
+  </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedChildId(null)}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold transition ${
-              selectedChildId === null
-                ? "bg-cyan-50 text-cyan-600"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Home size={18} />
-            Dashboard
-          </button>
+  <button
+    type="button"
+    onClick={() => setSelectedChildId(null)}
+    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+  >
+    <Users size={18} />
+    Children
+  </button>
 
-          <button
-            type="button"
-            onClick={() => setSelectedChildId(null)}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
-          >
-            <Users size={18} />
-            Children
-          </button>
+  {/* CHILD MENU */}
+  {selectedChild ? (
+    <>
+      <div className="px-4 pb-1 pt-6 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+        {selectedChild.name}
+      </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (children.length > 0) {
-                setSelectedChildId(children[0].id);
-              }
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
-          >
-            <SquarePlus size={18} />
-            Add Measurement
-          </button>
+   <button
+  type="button"
+  onClick={() => scrollToSection("child-overview")}
+  className="flex w-full items-center gap-3 rounded-xl bg-cyan-50 px-4 py-3 text-left font-semibold text-cyan-600"
+>
+  <Baby size={18} />
+  Overview
+</button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (children.length > 0) {
-                setSelectedChildId(children[0].id);
-              }
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
-          >
-            <ChartNoAxesCombined size={18} />
-            Growth Charts
-          </button>
+<button
+  type="button"
+  onClick={() => scrollToSection("add-measurement")}
+  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+>
+  <SquarePlus size={18} />
+  Add Measurement
+</button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (children.length > 0) {
-                setSelectedChildId(children[0].id);
-              }
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
-          >
-            <BookOpen size={18} />
-            Growth Story
-          </button>
+<button
+  type="button"
+  onClick={() => scrollToSection("growth-chart")}
+  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+>
+  <ChartNoAxesCombined size={18} />
+  Growth Charts
+</button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (children.length > 0) {
-                setSelectedChildId(children[0].id);
-              }
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
-          >
-            <Sparkles size={18} />
-            Simulator
-          </button>
+<button
+  type="button"
+  onClick={() => scrollToSection("growth-story")}
+  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+>
+  <BookOpen size={18} />
+  Growth Story
+</button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (children.length > 0) {
-                setSelectedChildId(children[0].id);
-              }
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
-          >
-            <FileText size={18} />
-            Reports
-          </button>
-        </nav>
+<button
+  type="button"
+  onClick={() => scrollToSection("growth-simulator")}
+  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+>
+  <Sparkles size={18} />
+  Simulator
+</button>
+
+<button
+  type="button"
+  onClick={() => scrollToSection("child-overview")}
+  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-600 transition hover:bg-slate-50"
+>
+  <FileText size={18} />
+  Reports
+</button>
+    </>
+  ) : null}
+</nav>
 
         {/* Bottom */}
         <div className="mt-auto space-y-2 pt-8">
@@ -1466,56 +1486,59 @@ const statusClass = !hasAnalytics
 
       <div className="mt-4 divide-y divide-slate-100">
 
-        <button
-          type="button"
-          onClick={() => {
-            if (children.length > 0) {
-              setSelectedChildId(children[0].id);
-            }
-          }}
-          className="flex w-full items-center justify-between py-4 text-left"
-        >
-          <div className="flex items-center gap-3 font-semibold text-cyan-600">
-            <PlusCircle size={18} />
-            Add Measurement
-          </div>
+    <button
+  type="button"
+  onClick={() => {
+    if (children.length > 0) {
+      setPendingSection("add-measurement");
+      setSelectedChildId(children[0].id);
+    }
+  }}
+  className="flex w-full items-center justify-between py-4 text-left"
+>
+  <div className="flex items-center gap-3 font-semibold text-cyan-600">
+    <PlusCircle size={18} />
+    Add Measurement
+  </div>
 
-          <span className="text-slate-400">›</span>
-        </button>
+  <span className="text-slate-400">›</span>
+</button>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (children.length > 0) {
-              setSelectedChildId(children[0].id);
-            }
-          }}
-          className="flex w-full items-center justify-between py-4 text-left"
-        >
-          <div className="flex items-center gap-3 font-semibold text-cyan-600">
-            <ChartNoAxesCombined size={18} />
-            View Growth Charts
-          </div>
+       <button
+  type="button"
+  onClick={() => {
+    if (children.length > 0) {
+      setPendingSection("growth-chart");
+      setSelectedChildId(children[0].id);
+    }
+  }}
+  className="flex w-full items-center justify-between py-4 text-left"
+>
+  <div className="flex items-center gap-3 font-semibold text-cyan-600">
+    <ChartNoAxesCombined size={18} />
+    View Growth Charts
+  </div>
 
-          <span className="text-slate-400">›</span>
-        </button>
+  <span className="text-slate-400">›</span>
+</button>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (children.length > 0) {
-              setSelectedChildId(children[0].id);
-            }
-          }}
-          className="flex w-full items-center justify-between py-4 text-left"
-        >
-          <div className="flex items-center gap-3 font-semibold text-cyan-600">
-            <FileText size={18} />
-            Generate Report
-          </div>
+       <button
+  type="button"
+  onClick={() => {
+    if (children.length > 0) {
+      setPendingSection("child-overview");
+      setSelectedChildId(children[0].id);
+    }
+  }}
+  className="flex w-full items-center justify-between py-4 text-left"
+>
+  <div className="flex items-center gap-3 font-semibold text-cyan-600">
+    <FileText size={18} />
+    Generate Report
+  </div>
 
-          <span className="text-slate-400">›</span>
-        </button>
+  <span className="text-slate-400">›</span>
+</button>
 
       </div>
     </section>
@@ -1545,8 +1568,11 @@ const statusClass = !hasAnalytics
           ) : (
             <>
             
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-5">
+<div
+  id="child-overview"
+  className="scroll-mt-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+>
+                  <div className="flex items-center gap-5">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-cyan-100 bg-cyan-50 text-cyan-600">
                     <User size={28} />
                   </div>
@@ -1818,23 +1844,31 @@ const statusClass = !hasAnalytics
                 )}
               </div>
 
-              <GrowthStory
-                measurements={measurements}
-                insights={insights}
-              />
+        <div id="growth-story" className="scroll-mt-6">
+  <GrowthStory
+    measurements={measurements}
+    insights={insights}
+  />
+</div>
 
-              <GrowthSimulator
-                measurements={measurements}
-                birthDate={selectedChild.birthDate}
-                gender={selectedChild.gender as Gender}
-                growthRate={simulationGrowthRate}
-                monthsAhead={simulationMonthsAhead}
-                onGrowthRateChange={setSimulationGrowthRate}
-                onMonthsAheadChange={setSimulationMonthsAhead}
-              />
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
+<div id="growth-simulator" className="scroll-mt-6">
+  <GrowthSimulator
+    measurements={measurements}
+    birthDate={selectedChild.birthDate}
+    gender={selectedChild.gender as Gender}
+    growthRate={simulationGrowthRate}
+    monthsAhead={simulationMonthsAhead}
+    onGrowthRateChange={setSimulationGrowthRate}
+    onMonthsAheadChange={setSimulationMonthsAhead}
+  />
+</div>
+
+<div
+  id="growth-chart"
+  className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+>
+                  <div className="mb-2 flex items-center justify-between">
                   <div>
                     <div className="text-2xl font-bold text-slate-900">
                       WHO Height-for-age Chart
@@ -1905,6 +1939,11 @@ const statusClass = !hasAnalytics
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
+                      <div
+  id="add-measurement"
+  className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+> 
+</div>
                       <div className="text-2xl font-bold text-slate-900">
                         Добавить измерение
                       </div>
