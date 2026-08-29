@@ -40,6 +40,7 @@ import {
   logout,
   getToken,
   changePassword,
+  loginDemo,
 } from "./api";
 
 import {
@@ -279,6 +280,8 @@ const [changingPassword, setChangingPassword] =
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
+  const [demoLoading, setDemoLoading] = useState(false);
+
   const [children, setChildren] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -460,6 +463,26 @@ setIsAuthenticated(true);
     }
   } finally {
     setAuthLoading(false);
+  }
+}
+
+async function handleDemoLogin() {
+  try {
+    setDemoLoading(true);
+    setAuthError(null);
+
+    const user = await loginDemo();
+
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+  } catch (error) {
+    if (error instanceof Error) {
+      setAuthError(error.message);
+    } else {
+      setAuthError("Failed to start demo.");
+    }
+  } finally {
+    setDemoLoading(false);
   }
 }
 
@@ -881,39 +904,81 @@ const chartDataWithSimulation = useMemo(() => {
             />
           </div>
 
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-600">
-              Пароль
-            </label>
+                            <div>
+                      <label className="mb-2 block text-sm font-semibold text-slate-600">
+                        Пароль
+                      </label>
 
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
-            />
-          </div>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-cyan-400"
+                      />
+                    </div>
 
-          {authError ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {authError}
-            </div>
-          ) : null}
+                    {authError ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                        {authError}
+                      </div>
+                    ) : null}
 
-          <button
-            type="submit"
-            disabled={authLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
-          >
-            {authLoading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : null}
+                    <button
+                      type="submit"
+                      disabled={authLoading}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
+                    >
+                      {authLoading ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : null}
 
-            {authMode === "login" ? "Войти" : "Создать аккаунт"}
-          </button>
-        </form>
+                      {authMode === "login" ? "Войти" : "Создать аккаунт"}
+                    </button>
 
+                    </form>
+
+                    {authMode === "login" && (
+                      <>
+                        <div className="my-5 flex items-center gap-3">
+                          <div className="h-px flex-1 bg-slate-200" />
+
+                          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            or
+                          </span>
+
+                          <div className="h-px flex-1 bg-slate-200" />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleDemoLogin()}
+                          disabled={demoLoading}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 font-semibold text-cyan-700 transition hover:bg-cyan-100 disabled:opacity-60"
+                        >
+                          {demoLoading ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <Activity size={18} />
+                          )}
+
+                          {demoLoading ? "Loading demo..." : "Try Demo"}
+                        </button>
+                      </>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode(authMode === "login" ? "register" : "login");
+                        setAuthError(null);
+                      }}
+                      className="mt-5 w-full text-sm font-semibold text-cyan-600"
+                    >
+                      {authMode === "login"
+                        ? "Нет аккаунта? Зарегистрироваться"
+                        : "Уже есть аккаунт? Войти"}
+                    </button>
         <button
           type="button"
           onClick={() => {

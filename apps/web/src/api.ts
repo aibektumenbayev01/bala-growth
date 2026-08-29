@@ -270,3 +270,21 @@ export async function changePassword(
     throw new Error(data.error ?? "Failed to change password");
   }
 }
+
+export async function loginDemo() {
+  const res = await fetch(`${API_BASE}/auth/demo`, {
+    method: "POST",
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(
+      data.error ?? "Failed to start demo"
+    );
+  }
+
+  saveToken(data.token);
+
+  return data.user;
+}
