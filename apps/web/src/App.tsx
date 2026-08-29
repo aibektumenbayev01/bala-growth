@@ -1224,41 +1224,51 @@ return (
                   .at(-1)
               : null;
 
-          const childInsights =
-            dashboardChild?.insights ?? null;
 
-          const status =
-            childInsights?.status ?? "normal";
+const childInsights =
+  dashboardChild?.insights ?? null;
 
-          const isCheckup =
-            status === "requires_attention";
+const status = childInsights?.status;
 
-          const isMonitoring =
-            status === "below_expected_growth";
+const hasAnalytics = Boolean(childInsights);
 
-          const cardBorder = isCheckup
-            ? "border-red-200"
-            : isMonitoring
-              ? "border-amber-200"
-              : "border-emerald-200";
+const isCheckup =
+  status === "requires_attention";
 
-          const avatarClass = isCheckup
-            ? "border-red-200 bg-red-50 text-red-500"
-            : isMonitoring
-              ? "border-amber-200 bg-amber-50 text-amber-500"
-              : "border-emerald-200 bg-emerald-50 text-emerald-600";
+const isMonitoring =
+  status === "below_expected_growth";
 
-          const statusClass = isCheckup
-            ? "bg-red-50 text-red-600"
-            : isMonitoring
-              ? "bg-amber-50 text-amber-600"
-              : "bg-emerald-50 text-emerald-600";
+const cardBorder = !hasAnalytics
+  ? "border-slate-200"
+  : isCheckup
+    ? "border-red-200"
+    : isMonitoring
+      ? "border-amber-200"
+      : "border-emerald-200";
 
-          const statusText = isCheckup
-            ? "Needs Check-up"
-            : isMonitoring
-              ? "Requires Monitoring"
-              : "All Good";
+const avatarClass = !hasAnalytics
+  ? "border-slate-200 bg-slate-50 text-slate-400"
+  : isCheckup
+    ? "border-red-200 bg-red-50 text-red-500"
+    : isMonitoring
+      ? "border-amber-200 bg-amber-50 text-amber-500"
+      : "border-emerald-200 bg-emerald-50 text-emerald-600";
+
+const statusClass = !hasAnalytics
+  ? "bg-slate-50 text-slate-500"
+  : isCheckup
+    ? "bg-red-50 text-red-600"
+    : isMonitoring
+      ? "bg-amber-50 text-amber-600"
+      : "bg-emerald-50 text-emerald-600";
+
+ const statusText = !hasAnalytics
+  ? "No analytics yet"
+  : isCheckup
+    ? "Needs Check-up"
+    : isMonitoring
+      ? "Requires Monitoring"
+      : "All Good";
 
           return (
             <div
