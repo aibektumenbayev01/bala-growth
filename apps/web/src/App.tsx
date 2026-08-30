@@ -348,6 +348,14 @@ const [changingPassword, setChangingPassword] =
   const [measurementHeight, setMeasurementHeight] = useState("");
   const [measurementWeight, setMeasurementWeight] = useState("");
   const [measurementMode, setMeasurementMode] = useState<"manual" | "plot">("manual");
+  const [measurementFormError, setMeasurementFormError] = useState<string | null>(null);
+  const [measurementSuccess, setMeasurementSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!measurementSuccess) return;
+    const timer = window.setTimeout(() => setMeasurementSuccess(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [measurementSuccess]);
 
   const [simulationGrowthRate, setSimulationGrowthRate] = useState(5);
   const [simulationMonthsAhead, setSimulationMonthsAhead] = useState(12);
@@ -578,6 +586,8 @@ async function handleDemoLogin() {
     if (!selectedChildId) return;
     try {
       setSubmittingMeasurement(true);
+      setMeasurementFormError(null);
+      setMeasurementSuccess(null);
       await createMeasurement(selectedChildId, {
         date,
         height,
@@ -586,8 +596,10 @@ async function handleDemoLogin() {
       await loadMeasurements(selectedChildId);
       await loadInsights(selectedChildId);
       await loadDashboardData(children);
+      setMeasurementSuccess("Измерение успешно сохранено.");
     } catch (error) {
       console.error("Failed to create measurement:", error);
+      setMeasurementFormError("Не удалось сохранить измерение. Проверьте данные и попробуйте снова.");
       throw error;
     } finally {
       setSubmittingMeasurement(false);
@@ -596,11 +608,19 @@ async function handleDemoLogin() {
 
   async function handleCreateMeasurement(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!measurementDate || !measurementHeight || !measurementWeight) return;
+    setMeasurementFormError(null);
+    setMeasurementSuccess(null);
+    if (!measurementDate || !measurementHeight || !measurementWeight) {
+      setMeasurementFormError("Заполните дату, рост и вес.");
+      return;
+    }
     const parsedDate = parseDateInputAsUtc(measurementDate);
     const parsedHeight = Number(measurementHeight);
     const parsedWeight = Number(measurementWeight);
-    if (Number.isNaN(parsedDate.getTime()) || !Number.isFinite(parsedHeight) || !Number.isFinite(parsedWeight) || parsedHeight <= 0 || parsedWeight <= 0) return;
+    if (Number.isNaN(parsedDate.getTime()) || !Number.isFinite(parsedHeight) || !Number.isFinite(parsedWeight) || parsedHeight <= 0 || parsedWeight <= 0) {
+      setMeasurementFormError("Введите корректные положительные значения роста и веса.");
+      return;
+    }
     try {
       await saveMeasurement(parsedDate, parsedHeight, parsedWeight);
       setMeasurementDate(getTodayIsoDate());
@@ -1953,67 +1973,66 @@ const statusClass = !hasAnalytics
               </div>
 
               <div className={`grid gap-5 ${measurementMode === "manual" ? "xl:grid-cols-[320px_minmax(0,1fr)]" : "xl:grid-cols-1"}`}>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div id="add-measurement" className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div
-  id="add-measurement"
-  className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-> 
-</div>
-                      <div className="text-2xl font-bold text-slate-900">
+                      <div className="text-xl font-bold text-slate-900">
                         Добавить измерение
                       </div>
-                      <div className="mt-1 text-lg leading-6 text-slate-500">
-                        Enter values or plot them on clinical growth curves.
+                      <div className="mt-1 text-sm leading-5 text-slate-500">
+                        Введите значения вручную или отметьте их на графике роста.
                       </div>
                     </div>
 
                     {hasInsightWarnings ? (
                       <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-semibold text-red-600">
-                        Warning signs
+                        Есть отклонения
                       </span>
                     ) : null}
                   </div>
 
-                  <div className="mt-5 inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Measurement entry mode">
-                    <button type="button" role="tab" aria-selected={measurementMode === "manual"} onClick={() => setMeasurementMode("manual")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${measurementMode === "manual" ? "bg-white text-cyan-700 shadow-sm" : "text-slate-500"}`}>Enter values</button>
-                    <button type="button" role="tab" aria-selected={measurementMode === "plot"} onClick={() => setMeasurementMode("plot")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${measurementMode === "plot" ? "bg-white text-cyan-700 shadow-sm" : "text-slate-500"}`}>Plot on growth chart</button>
+                  <div className="mt-4 grid grid-cols-2 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Способ добавления измерения">
+                    <button type="button" role="tab" aria-selected={measurementMode === "manual"} onClick={() => { setMeasurementMode("manual"); setMeasurementFormError(null); }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${measurementMode === "manual" ? "bg-white text-cyan-700 shadow-sm" : "text-slate-500"}`}>Ввести значения</button>
+                    <button type="button" role="tab" aria-selected={measurementMode === "plot"} onClick={() => { setMeasurementMode("plot"); setMeasurementFormError(null); }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${measurementMode === "plot" ? "bg-white text-cyan-700 shadow-sm" : "text-slate-500"}`}>Отметить на графике</button>
                   </div>
 
-                  {measurementMode === "manual" ? <form onSubmit={handleCreateMeasurement} className="mt-5 space-y-3">
-                    <input
+                  {measurementSuccess ? <div role="status" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-700">{measurementSuccess}</div> : null}
+
+                  {measurementMode === "manual" ? <form onSubmit={handleCreateMeasurement} className="mt-4 space-y-3">
+                    <label className="block text-xs font-semibold text-slate-600">Дата измерения<input
                       type="date"
                       value={measurementDate}
-                      onChange={(e) => setMeasurementDate(e.target.value)}
+                      onChange={(e) => { setMeasurementDate(e.target.value); setMeasurementFormError(null); setMeasurementSuccess(null); }}
                       max={getTodayIsoDate()}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition focus:border-cyan-400"
-                    />
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 font-normal text-slate-900 outline-none transition focus:border-cyan-400"
+                    /></label>
 
-                    <input
+                    <label className="block text-xs font-semibold text-slate-600">Рост, см<input
                       type="number"
                       step="0.1"
                       min="1"
                       value={measurementHeight}
-                      onChange={(e) => setMeasurementHeight(e.target.value)}
-                      placeholder="Рост (см)"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition focus:border-cyan-400"
-                    />
+                      onChange={(e) => { setMeasurementHeight(e.target.value); setMeasurementFormError(null); setMeasurementSuccess(null); }}
+                      placeholder="Например, 124.5"
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 font-normal text-slate-900 outline-none transition focus:border-cyan-400"
+                    /></label>
 
-                    <input
+                    <label className="block text-xs font-semibold text-slate-600">Вес, кг<input
                       type="number"
                       step="0.1"
                       min="0.1"
                       value={measurementWeight}
-                      onChange={(e) => setMeasurementWeight(e.target.value)}
-                      placeholder="Вес (кг)"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 outline-none transition focus:border-cyan-400"
-                    />
+                      onChange={(e) => { setMeasurementWeight(e.target.value); setMeasurementFormError(null); setMeasurementSuccess(null); }}
+                      placeholder="Например, 28.2"
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-2.5 font-normal text-slate-900 outline-none transition focus:border-cyan-400"
+                    /></label>
+
+                    {measurementFormError ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{measurementFormError}</div> : null}
 
                     <button
                       type="submit"
                       disabled={submittingMeasurement}
-                      className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 font-semibold text-white transition hover:bg-cyan-600 disabled:opacity-60"
                     >
                       {submittingMeasurement ? (
                         <Loader2 size={18} className="animate-spin" />
