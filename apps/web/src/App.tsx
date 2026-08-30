@@ -2029,6 +2029,7 @@ const statusClass = !hasAnalytics
                     maxDate={getTodayIsoDate()}
                     saving={submittingMeasurement}
                     onDateChange={setMeasurementDate}
+                    onCancel={() => setMeasurementMode("manual")}
                     onSave={async ({ date, height, weight }) => {
                       await saveMeasurement(parseDateInputAsUtc(date), height, weight);
                       setMeasurementDate(getTodayIsoDate());
