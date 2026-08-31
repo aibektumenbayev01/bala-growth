@@ -1,10 +1,14 @@
 import jsPDF from "jspdf";
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 import type {
   Child,
   ChildGrowthInsights,
   Measurement,
 } from "@bala/shared";
+import { getAgeInMonths } from "../lib/growth";
+import { cdcBoys2to20, cdcGirls2to20, lmsValue } from "../who/cdc-2-20";
+import type { LmsReferencePoint } from "../who/cdc-2-20";
 
 type GrowthReportButtonProps = {
   child: Child;
@@ -59,11 +63,82 @@ async function imageToDataUrl(src: string) {
   });
 }
 
+function interpolateLms(reference: LmsReferencePoint[], ageMonths: number) {
+  const upperIndex = reference.findIndex((point) => point.ageMonths >= ageMonths);
+  if (upperIndex <= 0) return reference[Math.max(upperIndex, 0)].weight;
+  if (upperIndex < 0) return reference.at(-1)!.weight;
+  const lower = reference[upperIndex - 1];
+  const upper = reference[upperIndex];
+  const ratio = (ageMonths - lower.ageMonths) / (upper.ageMonths - lower.ageMonths);
+  return lower.weight.map((value, index) => value + (upper.weight[index] - value) * ratio) as [number, number, number];
+}
+
+function prepareWeightChartData(child: Child, measurements: Measurement[]) {
+  const reference = child.gender === "male" ? cdcBoys2to20 : cdcGirls2to20;
+  const observed = measurements.map((measurement) => ({
+    ageMonths: getAgeInMonths(child.birthDate, measurement.date) + 0.5,
+    weight: Number(measurement.weight),
+  }));
+  const ages = Array.from(new Set([...reference.map((point) => point.ageMonths), ...observed.map((point) => point.ageMonths)])).sort((a, b) => a - b);
+  const latestObservedAge = observed.length ? Math.max(...observed.map((point) => point.ageMonths)) : null;
+
+  return ages.map((ageMonths) => {
+    const lms = interpolateLms(reference, ageMonths);
+    const measurement = observed.find((point) => point.ageMonths === ageMonths);
+    return {
+      ageMonths,
+      p3: lmsValue(lms, -1.880794),
+      p15: lmsValue(lms, -1.036433),
+      p50: lmsValue(lms, 0),
+      p85: lmsValue(lms, 1.036433),
+      p97: lmsValue(lms, 1.880794),
+      childWeight: measurement?.weight ?? null,
+      latestWeight: measurement && ageMonths === latestObservedAge ? measurement.weight : null,
+    };
+  });
+}
+
+async function chartSvgToPng(elementId: string): Promise<string | null> {
+  const chartElement = document.getElementById(elementId);
+  const sourceSvg = chartElement?.querySelector("svg");
+  if (!sourceSvg) return null;
+
+  const svg = sourceSvg.cloneNode(true) as SVGSVGElement;
+  svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const width = sourceSvg.clientWidth || 800;
+  const height = sourceSvg.clientHeight || 320;
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+
+  const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error(`Failed to render chart: ${elementId}`));
+      image.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas is not available");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function GrowthReportButton({
   child,
   measurements,
   insights,
 }: GrowthReportButtonProps) {
+  const weightChartData = prepareWeightChartData(child, measurements);
   async function generatePdf() {
     try {
       const pdf = new jsPDF({
@@ -443,169 +518,116 @@ export default function GrowthReportButton({
         assessmentY + 29
       );
 
-      // HISTORY + CHART
-      const lowerY = 154;
-      const historyWidth = 62;
-      const chartX = margin + historyWidth + 7;
-      const chartWidth = contentWidth - historyWidth - 7;
+      // SIDE-BY-SIDE GROWTH CHARTS
+      const chartsY = 152;
+      const chartGap = 3;
+      const chartWidth = (contentWidth - chartGap) / 2;
+      const chartHeight = 61;
+      const heightChartX = margin;
+      const weightChartX = margin + chartWidth + chartGap;
 
+      for (const [x, title, subtitle] of [
+        [heightChartX, "WHO Height-for-age Chart", "WHO percentiles + observed and predicted height"],
+        [weightChartX, "WHO Weight-for-age Chart", "WHO percentiles + observed weight"],
+      ] as const) {
+        roundedCard(x, chartsY, chartWidth, chartHeight, [255, 255, 255]);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.8);
+        pdf.setTextColor(...TEAL);
+        pdf.text(title, x + 3, chartsY + 6);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(5.4);
+        pdf.setTextColor(...MUTED);
+        pdf.text(subtitle, x + 3, chartsY + 11);
+      }
+
+      const [heightChartImage, weightChartImage] = await Promise.all([
+        chartSvgToPng("who-growth-chart").catch(() => null),
+        chartSvgToPng("who-weight-growth-chart").catch(() => null),
+      ]);
+
+      function addChartOrFallback(image: string | null, x: number, unavailable: string) {
+        if (image) {
+          pdf.addImage(image, "PNG", x + 2, chartsY + 13, chartWidth - 4, 37);
+        } else {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(6.2);
+          pdf.setTextColor(...MUTED);
+          pdf.text(unavailable, x + chartWidth / 2, chartsY + 32, { align: "center" });
+        }
+      }
+
+      addChartOrFallback(heightChartImage, heightChartX, "Height chart unavailable");
+      addChartOrFallback(weightChartImage, weightChartX, "Weight chart unavailable");
+
+      function chartLegend(x: number, includePrediction: boolean, metric: "height" | "weight") {
+        const y = chartsY + 55;
+        pdf.setLineWidth(0.55);
+        pdf.setDrawColor(...GREEN);
+        pdf.line(x + 4, y, x + 11, y);
+        pdf.circle(x + 7.5, y, 0.9, "S");
+        pdf.setFontSize(5.2);
+        pdf.setTextColor(...TEXT);
+        pdf.text(`Observed ${metric}`, x + 13, y + 1.2);
+        pdf.setDrawColor(...BLUE);
+        pdf.line(x + 39, y, x + 46, y);
+        pdf.text("WHO percentiles", x + 48, y + 1.2);
+        pdf.setDrawColor(...PURPLE);
+        pdf.circle(x + 75, y, 1, "S");
+        pdf.text("Latest", x + 78, y + 1.2);
+        if (includePrediction) {
+          pdf.setLineDashPattern([1.5, 1.2], 0);
+          pdf.setDrawColor(...BLUE);
+          pdf.line(x + 4, y + 4, x + 11, y + 4);
+          pdf.setLineDashPattern([], 0);
+          pdf.text("Predicted height (6 mo)", x + 13, y + 5.2);
+        }
+      }
+
+      chartLegend(heightChartX, Boolean(insights?.predictedPoints.length), "height");
+      chartLegend(weightChartX, false, "weight");
+
+      // MEASUREMENT HISTORY
+      const historyY = 217;
+      const tableY = historyY + 4;
+      const tableHeight = 38;
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(9.5);
+      pdf.setFontSize(8.5);
       pdf.setTextColor(...TEAL);
-      pdf.text("Measurement History", margin, lowerY);
-
-      pdf.setTextColor(...NAVY);
-      pdf.text("WHO Height-for-age Chart", chartX, lowerY);
-
-      const tableY = lowerY + 5;
-      const tableHeight = 55;
-
-      roundedCard(
-        margin,
-        tableY,
-        historyWidth,
-        tableHeight,
-        [255, 255, 255]
-      );
-
+      pdf.text("Measurement History", margin, historyY);
+      roundedCard(margin, tableY, contentWidth, tableHeight, [255, 255, 255]);
       pdf.setFillColor(239, 250, 251);
-      pdf.roundedRect(
-        margin,
-        tableY,
-        historyWidth,
-        10,
-        3,
-        3,
-        "F"
-      );
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(6.2);
-      pdf.setTextColor(...TEAL);
-
-      pdf.text("DATE", margin + 3, tableY + 6.5);
-      pdf.text("HEIGHT", margin + 25, tableY + 6.5);
-      pdf.text("WEIGHT", margin + 45, tableY + 6.5);
+      pdf.roundedRect(margin + 1, tableY + 1, contentWidth - 2, 6, 2, 2, "F");
+      pdf.setFontSize(5.8);
+      pdf.text("DATE", margin + 4, tableY + 5);
+      pdf.text("AGE", margin + 55, tableY + 5);
+      pdf.text("HEIGHT (cm)", margin + 112, tableY + 5);
+      pdf.text("WEIGHT (kg)", margin + 158, tableY + 5);
 
       const visibleMeasurements = sortedMeasurements.slice(-5);
-      let rowY = tableY + 17;
-
+      let rowY = tableY + 11;
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(6.8);
+      pdf.setFontSize(5.8);
       pdf.setTextColor(...TEXT);
-
       for (const measurement of visibleMeasurements) {
-        pdf.text(formatDate(measurement.date), margin + 3, rowY);
-        pdf.text(`${measurement.height}`, margin + 27, rowY);
-        pdf.text(`${measurement.weight}`, margin + 47, rowY);
-
+        const ageMonths = getAgeInMonths(child.birthDate, measurement.date);
+        pdf.text(formatDate(measurement.date), margin + 4, rowY);
+        pdf.text(`${Math.floor(ageMonths / 12)} years ${ageMonths % 12} months`, margin + 55, rowY);
+        pdf.text(`${measurement.height}`, margin + 116, rowY);
+        pdf.text(`${measurement.weight}`, margin + 163, rowY);
         pdf.setDrawColor(...BORDER);
-        pdf.line(
-          margin + 2,
-          rowY + 3.3,
-          margin + historyWidth - 2,
-          rowY + 3.3
-        );
-
-        rowY += 8;
+        pdf.line(margin + 3, rowY + 2, margin + contentWidth - 3, rowY + 2);
+        rowY += 5.2;
       }
 
       if (sortedMeasurements.length > 5) {
-        pdf.setFontSize(5.8);
+        pdf.setFontSize(5);
         pdf.setTextColor(...MUTED);
-        pdf.text(
-          `Showing latest 5 of ${sortedMeasurements.length} measurements`,
-          margin + 3,
-          tableY + tableHeight - 3
-        );
-      }
-
-      const chartElement =
-        document.getElementById("who-growth-chart");
-
-      if (chartElement) {
-        const svgElement = chartElement.querySelector("svg");
-
-        if (svgElement) {
-          const serializer = new XMLSerializer();
-          const svgString = serializer.serializeToString(svgElement);
-
-          const svgBlob = new Blob([svgString], {
-            type: "image/svg+xml;charset=utf-8",
-          });
-
-          const url = URL.createObjectURL(svgBlob);
-
-          try {
-            const image = new Image();
-
-            await new Promise<void>((resolve, reject) => {
-              image.onload = () => resolve();
-              image.onerror = () =>
-                reject(new Error("Failed to render WHO chart"));
-              image.src = url;
-            });
-
-            const canvas = document.createElement("canvas");
-
-            const svgWidth = svgElement.clientWidth || 800;
-            const svgHeight = svgElement.clientHeight || 320;
-
-            canvas.width = svgWidth * 2;
-            canvas.height = svgHeight * 2;
-
-            const context = canvas.getContext("2d");
-
-            if (!context) {
-              throw new Error("Canvas is not available");
-            }
-
-            context.fillStyle = "#ffffff";
-            context.fillRect(0, 0, canvas.width, canvas.height);
-
-            context.drawImage(
-              image,
-              0,
-              0,
-              canvas.width,
-              canvas.height
-            );
-
-            const chartImage = canvas.toDataURL("image/png");
-
-            const maxChartHeight = 52;
-            let chartHeight =
-              (canvas.height * chartWidth) / canvas.width;
-
-            if (chartHeight > maxChartHeight) {
-              chartHeight = maxChartHeight;
-            }
-
-            pdf.addImage(
-              chartImage,
-              "PNG",
-              chartX,
-              tableY + 1,
-              chartWidth,
-              chartHeight
-            );
-          } finally {
-            URL.revokeObjectURL(url);
-          }
-        }
-      } else {
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(7);
-        pdf.setTextColor(...MUTED);
-        pdf.text(
-          "Open the child's growth chart before generating the report.",
-          chartX,
-          tableY + 12
-        );
+        pdf.text(`Showing latest 5 of ${sortedMeasurements.length} measurements`, margin + 4, tableY + tableHeight - 2);
       }
 
       // WARNING SIGNALS
-      const warningY = 219;
+      const warningY = 262;
 
       if (insights && insights.anomalies.length > 0) {
         const warning = insights.anomalies[0];
@@ -614,7 +636,7 @@ export default function GrowthReportButton({
           margin,
           warningY,
           contentWidth,
-          28,
+          16,
           [255, 246, 246],
           [249, 204, 207],
           4
@@ -622,38 +644,38 @@ export default function GrowthReportButton({
 
         drawCircleIcon(
           margin + 10,
-          warningY + 14,
-          6.8,
+          warningY + 8,
+          4.6,
           [244, 80, 88],
           "!",
           [255, 255, 255]
         );
 
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9.4);
+        pdf.setFontSize(7.8);
         pdf.setTextColor(190, 31, 38);
-        pdf.text("Warning Signals", margin + 23, warningY + 10);
+        pdf.text("Warning Signals", margin + 19, warningY + 6);
 
-        pdf.setFontSize(7.5);
+        pdf.setFontSize(6.2);
         pdf.text(
           prettyFlag(warning.flag),
-          margin + 64,
-          warningY + 10
+          margin + 55,
+          warningY + 6
         );
 
         pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(6.8);
+        pdf.setFontSize(5.6);
         pdf.setTextColor(...TEXT);
 
         const warningLines = pdf.splitTextToSize(
           warning.explanation,
-          contentWidth - 31
+          contentWidth - 25
         );
 
         pdf.text(
-          warningLines.slice(0, 2),
-          margin + 23,
-          warningY + 18
+          warningLines.slice(0, 1),
+          margin + 19,
+          warningY + 12
         );
 
         if (insights.anomalies.length > 1) {
@@ -664,7 +686,7 @@ export default function GrowthReportButton({
               insights.anomalies.length - 1 === 1 ? "" : "s"
             }`,
             pageWidth - margin - 4,
-            warningY + 24,
+            warningY + 14,
             { align: "right" }
           );
         }
@@ -673,7 +695,7 @@ export default function GrowthReportButton({
           margin,
           warningY,
           contentWidth,
-          28,
+          16,
           [244, 252, 248],
           [203, 237, 219],
           4
@@ -681,36 +703,36 @@ export default function GrowthReportButton({
 
         drawCircleIcon(
           margin + 10,
-          warningY + 14,
-          6.8,
+          warningY + 8,
+          4.6,
           [33, 168, 111],
           "OK",
           [255, 255, 255]
         );
 
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9.4);
+        pdf.setFontSize(7.8);
         pdf.setTextColor(...GREEN);
-        pdf.text("No Warning Signals", margin + 23, warningY + 10);
+        pdf.text("No Warning Signals", margin + 19, warningY + 6);
 
         pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(6.8);
+        pdf.setFontSize(5.6);
         pdf.setTextColor(...TEXT);
         pdf.text(
           "No growth warning signals are currently detected from the available measurements.",
-          margin + 23,
-          warningY + 18
+          margin + 19,
+          warningY + 12
         );
       }
 
       // DISCLAIMER
-      const disclaimerY = 253;
+      const disclaimerY = 281;
 
       roundedCard(
         margin,
         disclaimerY,
         contentWidth,
-        16,
+        9,
         [245, 249, 255],
         [207, 225, 246],
         3
@@ -718,15 +740,15 @@ export default function GrowthReportButton({
 
       drawCircleIcon(
         margin + 6,
-        disclaimerY + 8,
-        3.1,
+        disclaimerY + 4.5,
+        2.4,
         [36, 126, 210],
         "i",
         [255, 255, 255]
       );
 
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(6.3);
+      pdf.setFontSize(5.5);
       pdf.setTextColor(...TEXT);
 
       const disclaimerText =
@@ -739,9 +761,9 @@ export default function GrowthReportButton({
       );
 
       pdf.text(
-        disclaimerLines.slice(0, 2),
+        disclaimerLines.slice(0, 1),
         margin + 12,
-        disclaimerY + 6.5
+        disclaimerY + 5.5
       );
 
       // FOOTER
@@ -786,12 +808,47 @@ export default function GrowthReportButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={generatePdf}
-      className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-    >
-      Download Growth Report
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={generatePdf}
+        className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+      >
+        Download Growth Report
+      </button>
+      <div
+        id="who-weight-growth-chart"
+        aria-hidden="true"
+        style={{ position: "fixed", left: -10000, top: 0, width: 800, height: 320, background: "white" }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={weightChartData} margin={{ top: 10, right: 12, bottom: 8, left: 4 }}>
+            <XAxis dataKey="ageMonths" tickFormatter={(value) => `${Math.floor(value / 12)}г`} tick={{ fontSize: 10 }} />
+            <YAxis unit=" кг" tick={{ fontSize: 10 }} width={48} />
+            <Line type="monotone" dataKey="p3" stroke="#3182bd" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="p15" stroke="#3182bd" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="p50" stroke="#3182bd" strokeWidth={2} strokeDasharray="6 5" dot={false} />
+            <Line type="monotone" dataKey="p85" stroke="#3182bd" strokeWidth={1.5} dot={false} />
+            <Line type="monotone" dataKey="p97" stroke="#3182bd" strokeWidth={1.5} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="childWeight"
+              stroke="#0f766e"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "white", stroke: "#0f766e", strokeWidth: 2 }}
+              connectNulls={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="latestWeight"
+              stroke="transparent"
+              dot={{ r: 5, fill: "white", stroke: "#7e57c2", strokeWidth: 3 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </>
   );
 }
