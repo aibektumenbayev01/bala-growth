@@ -73,6 +73,45 @@ import PlotMeasurement from "./components/PlotMeasurement";
 
 type Gender = "male" | "female";
 
+const WHO_CURVE_STROKE = "#3182bd";
+const OBSERVED_HEIGHT_STROKE = "#0f766e";
+const PREDICTED_HEIGHT_STROKE = "#0284c7";
+const MEDIAN_STROKE_DASH = "6 5";
+
+type WhoLegendItemProps = {
+  label: string;
+  subtitle?: string;
+  color: string;
+  dashed?: boolean;
+  point?: boolean;
+};
+
+function WhoLegendItem({ label, subtitle, color, dashed = false, point = false }: WhoLegendItemProps) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <svg className="h-5 w-12 shrink-0" viewBox="0 0 48 20" aria-hidden="true">
+        <line x1="2" y1="10" x2="46" y2="10" stroke={color} strokeWidth="3" strokeDasharray={dashed ? "6 5" : undefined} />
+        {point ? <circle cx="24" cy="10" r="5" fill="white" stroke={color} strokeWidth="3" /> : null}
+      </svg>
+      <div className="leading-tight">
+        <div className="text-sm font-semibold text-slate-700">{label}</div>
+        {subtitle ? <div className="mt-1 text-xs text-slate-400">{subtitle}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function WhoChartLegend() {
+  return (
+    <div className="mx-auto mt-4 grid max-w-5xl grid-cols-1 justify-items-start gap-x-10 gap-y-4 px-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Обозначения графика роста">
+      <WhoLegendItem label="Наблюдаемые измерения" subtitle="(фактический рост)" color={OBSERVED_HEIGHT_STROKE} point />
+      <WhoLegendItem label="Прогнозируемый рост" subtitle="(прогноз WHO)" color={PREDICTED_HEIGHT_STROKE} dashed point />
+      <WhoLegendItem label="Кривые перцентилей WHO" subtitle="(референсный диапазон)" color={WHO_CURVE_STROKE} />
+      <WhoLegendItem label="Медиана (50-й перцентиль)" color={WHO_CURVE_STROKE} dashed />
+    </div>
+  );
+}
+
 function safeNumber(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -1934,11 +1973,11 @@ const statusClass = !hasAnalytics
                       <YAxis />
                       <Tooltip content={<ChartTooltip />} />
 
-                      <Line type="monotone" dataKey="p3" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="p15" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="p50" strokeWidth={3} dot={false} />
-                      <Line type="monotone" dataKey="p85" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="p97" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="p3" stroke={WHO_CURVE_STROKE} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="p15" stroke={WHO_CURVE_STROKE} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="p50" stroke={WHO_CURVE_STROKE} strokeWidth={3} strokeDasharray={MEDIAN_STROKE_DASH} dot={false} />
+                      <Line type="monotone" dataKey="p85" stroke={WHO_CURVE_STROKE} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="p97" stroke={WHO_CURVE_STROKE} strokeWidth={2} dot={false} />
 
                       <Line
                         type="monotone"
@@ -1953,23 +1992,24 @@ const statusClass = !hasAnalytics
                       <Line
                         type="monotone"
                         dataKey="childHeight"
-                        stroke="#0f766e"
+                        stroke={OBSERVED_HEIGHT_STROKE}
                         strokeWidth={3}
-                        dot={{ r: 4 }}
+                        dot={{ r: 4, fill: "white", stroke: OBSERVED_HEIGHT_STROKE, strokeWidth: 2 }}
                         connectNulls={false}
                       />
                       <Line
                         type="monotone"
                         dataKey="predictedHeight"
-                        stroke="#0284c7"
+                        stroke={PREDICTED_HEIGHT_STROKE}
                         strokeWidth={3}
                         strokeDasharray="5 5"
-                        dot={{ r: 3 }}
+                        dot={{ r: 4, fill: "white", stroke: PREDICTED_HEIGHT_STROKE, strokeWidth: 2 }}
                         connectNulls={false}
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+                <WhoChartLegend />
               </div>
 
               <div className={`grid gap-5 ${measurementMode === "manual" ? "xl:grid-cols-[320px_minmax(0,1fr)]" : "xl:grid-cols-1"}`}>
