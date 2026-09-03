@@ -5,9 +5,8 @@ A full-stack pediatric growth monitoring application for tracking children's hei
 🔗 **Live Demo:** https://bala-growth.onrender.com  
 Click **Try Demo** to explore without registration.
 
-## Demo
+🔗 **Demo Video:** https://www.youtube.com/watch?v=BPFbvjgAKoc
 
-![GrowthTrack KZ Demo](docs/demo.gif)
 
 ## Features
 
