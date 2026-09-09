@@ -315,9 +315,17 @@ function ChartTooltip({
 }
 
 export default function App() {
-    const [isAuthenticated, setIsAuthenticated] = useState(
-    () => Boolean(getToken())
-  );
+const [isAuthenticated, setIsAuthenticated] = useState(() => {
+  const params = new URLSearchParams(window.location.search);
+  const forceLanding = params.get("landing") === "1";
+
+  if (forceLanding) {
+    return false;
+  }
+
+  return Boolean(getToken());
+});
+
 type CurrentUser = {
   id: string;
   email: string;
